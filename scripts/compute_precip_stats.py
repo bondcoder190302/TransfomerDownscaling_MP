@@ -15,7 +15,7 @@ Usage (run from the repository root):
 Note on precipitation skewness:
   Precipitation distributions are heavily right-skewed (many zeros, rare large
   values). A log1p transform (log(1+x)) before fitting z-score statistics can
-  improve normalisation. Set LOG1P_TRANSFORM = True below to enable it; the same
+  improve normalization. Set LOG1P_TRANSFORM = True below to enable it; the same
   transform must then be applied to your data before loading (i.e. pre-process the
   .npy files with log1p before saving them to disk).
 """

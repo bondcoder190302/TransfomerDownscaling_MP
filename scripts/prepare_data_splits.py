@@ -32,10 +32,10 @@ SPLIT_DIR = "./DownScale_Paper/DownScale_Correction_split"
 START_DATE = datetime.date(2020, 6, 1)
 END_DATE   = datetime.date(2020, 8, 31)
 
-# Split boundary indices (0-based)
-TRAIN_END = 74   # exclusive → training = indices [0, TRAIN_END)
-VAL_END   = 83   # exclusive → validation  = indices [TRAIN_END, VAL_END)
-# test = indices [VAL_END, total)
+# Split boundary indices (0-based, exclusive upper bound)
+TRAIN_END = 74   # training   = indices [0, 74)  → 74 days
+VAL_END   = 83   # validation = indices [74, 83) →  9 days
+# test                        = indices [83, 92) →  9 days
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

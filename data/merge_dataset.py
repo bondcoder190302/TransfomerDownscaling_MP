@@ -123,6 +123,9 @@ class MergeDataset(RadarDataset):
             # Fixed/static variables use a single file whose name defaults to
             # '{first_token}_fix.npy' (e.g. 'HGT_fix.npy' for 'HGT_fix_cut_obs').
             if 'fix' in varName:
+                # Default: first token of varName + '_fix.npy'
+                # e.g. 'HGT_fix_cut_obs' → 'HGT_fix.npy'.
+                # Override with opt['fix_file_name'] if your file has a different name.
                 fix_fname = self.opt.get('fix_file_name',
                                          varName.split('_')[0] + '_fix.npy')
                 pathName = os.path.join(self.dirName_data, varName, fix_fname)
