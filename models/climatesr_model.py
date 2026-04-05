@@ -296,7 +296,12 @@ class ClimateSRModel(SRModel):
                     targets = target[[-1]].squeeze(0).cpu().numpy()[...,:swh,:swh]
                     outputs = output[[-1]].squeeze(0).cpu().numpy()[...,:swh,:swh]
                     file_name = self.info[0]
-                    area, base_time, lead_time = file_name.split('_')
+                    _parts = file_name.split('_')
+                    if len(_parts) == 3:
+                        area, base_time, lead_time = _parts
+                    else:
+                        # Date-format filenames (e.g. '20200601') have no area/lead fields.
+                        area, base_time, lead_time = file_name, file_name, '0'
 
                     if save_img or (not self.opt['val'].get('save_npy_onlyoutput', False)):
                         lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix_cut_obs', f'{area}_LAT.npy'))[:swh,:swh]
