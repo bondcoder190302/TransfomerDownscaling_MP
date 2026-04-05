@@ -117,23 +117,42 @@ class MergeDataset(RadarDataset):
         return data
 
     def get_var(self, varName, img_f):
-        area, base_time, lead_hour = img_f[:-4].split('_')
-        if 'fix' in varName:
-            var = varName.split('_')[0]
-            pathName = os.path.join(self.dirName_data, varName, f'{area}_{var}.npy')
-        elif 'obs' in varName:
-            gt_file = area + '_' + add_time(base_time, int(lead_hour)) + '.npy'
-            pathName = os.path.join(self.dirName_data, varName, gt_file)
+        file_format = self.opt.get('file_format', 'area_time')
+        if file_format == 'date':
+            # img_f is a plain date filename, e.g. '20200601.npy'.
+            # Fixed/static variables use a single file whose name defaults to
+            # '{first_token}_fix.npy' (e.g. 'HGT_fix.npy' for 'HGT_fix_cut_obs').
+            if 'fix' in varName:
+                fix_fname = self.opt.get('fix_file_name',
+                                         varName.split('_')[0] + '_fix.npy')
+                pathName = os.path.join(self.dirName_data, varName, fix_fname)
+            else:
+                # Both LR input and HR observation use the same date-named file.
+                pathName = os.path.join(self.dirName_data, varName, img_f)
+            if not os.path.exists(pathName):
+                return np.array([])
+            radar_img = np.load(pathName)
+            radar_img = self.do_normalize(radar_img, varName)
+            return radar_img
         else:
-            pathName = os.path.join(self.dirName_data, varName, img_f)
-        if not os.path.exists(pathName):
-            return np.array([])
-        if 'obs' in varName:
-            radar_img = np.load(pathName)[:1920, :1920]
-        else:
-            radar_img = np.load(pathName)[:192, :192]
-        radar_img = self.do_normalize(radar_img, varName)
-        return radar_img
+            # Original 'area_time' format: filenames are '{area}_{YYYYMMDDHH}_{HH}.npy'
+            area, base_time, lead_hour = img_f[:-4].split('_')
+            if 'fix' in varName:
+                var = varName.split('_')[0]
+                pathName = os.path.join(self.dirName_data, varName, f'{area}_{var}.npy')
+            elif 'obs' in varName:
+                gt_file = area + '_' + add_time(base_time, int(lead_hour)) + '.npy'
+                pathName = os.path.join(self.dirName_data, varName, gt_file)
+            else:
+                pathName = os.path.join(self.dirName_data, varName, img_f)
+            if not os.path.exists(pathName):
+                return np.array([])
+            if 'obs' in varName:
+                radar_img = np.load(pathName)[:1920, :1920]
+            else:
+                radar_img = np.load(pathName)[:192, :192]
+            radar_img = self.do_normalize(radar_img, varName)
+            return radar_img
 
     def __getitem__(self, ind):
         radar_seq = []
