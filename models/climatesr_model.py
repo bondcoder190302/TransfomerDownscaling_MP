@@ -163,7 +163,7 @@ class ClimateSRModel(SRModel):
             logger = get_root_logger()
             logger.warning(f'NaN/Inf detected in model output at iter {current_iter}, skipping parameter update')
             return
-        # Clip to ±4σ in normalized space to prevent extreme values from destabilising loss
+        # Clip to ±4σ in normalized space to prevent extreme values from destabilizing loss
         self.output = torch.clamp(self.output, -4.0, 4.0)
         l_total = 0
         loss_dict = OrderedDict()
@@ -442,15 +442,17 @@ class ClimateSRModel(SRModel):
 
             if self.common_stat['normalize'] == 'minmax':
                 for idx in range(len(self.common_stat['index_gt'])):
-                    max_temp = self.var_stats_dict[self.common_stat['varName_gt'][idx]]['max']
-                    min_temp = self.var_stats_dict[self.common_stat['varName_gt'][idx]]['min']
+                    stats = self.var_stats_dict[self.common_stat['varName_gt'][idx]]
+                    max_temp = stats['max']
+                    min_temp = stats['min']
                     output[:, idx] = output[:, idx] * (max_temp - min_temp) + min_temp
                     target[:, idx] = target[:, idx] * (max_temp - min_temp) + min_temp
                     image[:, idx] = image[:, idx] * (max_temp - min_temp) + min_temp
             elif self.common_stat['normalize'] == 'zscore':
                 for idx in range(len(self.common_stat['index_gt'])):
-                    mean_tmp = self.var_stats_dict[self.common_stat['varName_gt'][idx]]['mean']
-                    std_tmp = torch.sqrt(self.var_stats_dict[self.common_stat['varName_gt'][idx]]['var'])
+                    stats = self.var_stats_dict[self.common_stat['varName_gt'][idx]]
+                    mean_tmp = stats['mean']
+                    std_tmp = torch.sqrt(stats['var'])
                     output[:, idx] = output[:, idx] * std_tmp + mean_tmp
                     target[:, idx] = target[:, idx] * std_tmp + mean_tmp
                     image[:, idx] = image[:, idx] * std_tmp + mean_tmp
