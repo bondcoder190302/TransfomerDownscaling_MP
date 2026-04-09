@@ -884,12 +884,17 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         if self.add_hgt:
             self.hgt_layer = nn.ModuleList()
             self.hgt_layer.append(nn.Sequential(
-                nn.Conv2d(1, 2, 3, 1, 1),
-                nn.PixelUnshuffle(5),
+                nn.Conv2d(1, 4, 3, 1, 1),        # (B, 4, 64, 64)
+                nn.PixelUnshuffle(2),             # (B, 16, 32, 32) matches LR
                 nn.LeakyReLU(negative_slope=0.1, inplace=True),
-                nn.Conv2d(50, embed_dim // 4, 3, 1, 1),
-                nn.PixelUnshuffle(2),
+                nn.Conv2d(16, embed_dim, 3, 1, 1), # (B, 128, 32, 32)
                 nn.LeakyReLU(negative_slope=0.1, inplace=True),
+                #nn.Conv2d(1, 2, 3, 1, 1),
+                #nn.PixelUnshuffle(5),
+                #nn.LeakyReLU(negative_slope=0.1, inplace=True),
+                #nn.Conv2d(50, embed_dim // 4, 3, 1, 1),
+                #nn.PixelUnshuffle(2),
+                #nn.LeakyReLU(negative_slope=0.1, inplace=True),
             ))
             self.hgt_layer.append(nn.Sequential(
                 nn.Conv2d(embed_dim, embed_dim*2, kernel_size=4, stride=2, padding=1),

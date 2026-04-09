@@ -1,3 +1,7 @@
+# GENERATE TIME: Thu Apr  9 07:11:22 2026
+# CMD:
+# train.py -opt paper_options/Uformer_precip_zscore_option.yml
+
 # Configuration for single-variable precipitation downscaling.
 # Input : ERA5 Land daily precipitation at 0.1° (40×40 for region [76,21,80,25])
 # Target: CHIRPS daily precipitation at 0.05° (80×80)
@@ -43,7 +47,7 @@ datasets:
     dataset_enlarge_ratio: 1
     randomcrop: false
     # Full HR image size (80 px at 0.05°); LQ crop = gt_size / scale = 40
-    gt_size: 64
+    gt_size: 80
     prefetch_mode: ~
 
   val:

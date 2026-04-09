@@ -1,4 +1,4 @@
-# GENERATE TIME: Thu Apr  9 07:11:22 2026
+# GENERATE TIME: Thu Apr  9 08:38:25 2026
 # CMD:
 # train.py -opt paper_options/Uformer_precip_zscore_option.yml
 
@@ -47,7 +47,7 @@ datasets:
     dataset_enlarge_ratio: 1
     randomcrop: false
     # Full HR image size (80 px at 0.05°); LQ crop = gt_size / scale = 40
-    gt_size: 80
+    gt_size: 64
     prefetch_mode: ~
 
   val:
