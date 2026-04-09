@@ -158,6 +158,13 @@ class ClimateSRModel(SRModel):
         with torch.cuda.amp.autocast(enabled=self.amp_training):
             self.output = self.net_g(self.lq)
         self.output = self.output.float()
+        # Detect NaN/Inf in model output and skip the update to avoid corrupting weights
+        if not torch.isfinite(self.output).all():
+            logger = get_root_logger()
+            logger.warning(f'NaN/Inf detected in model output at iter {current_iter}, skipping parameter update')
+            return
+        # Clip to ±4σ in normalized space to prevent extreme values from destabilising loss
+        self.output = torch.clamp(self.output, -4.0, 4.0)
         l_total = 0
         loss_dict = OrderedDict()
         # pixel loss
@@ -257,6 +264,8 @@ class ClimateSRModel(SRModel):
 
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h ,w)
+            # Clip to ±4σ in normalized space before denormalization
+            output = torch.clamp(output, -4.0, 4.0)
             target = self.gt.reshape(-1, c, h ,w)
             if isinstance(self.lq, dict):
                 if 'lq' in self.lq:
@@ -386,6 +395,120 @@ class ClimateSRModel(SRModel):
                     # update the best metric result
                     self._update_best_metric_result(dataset_name, metric, self.metric_results[metric], current_iter)
                 self._log_validation_metric_values(current_iter, dataset_name, tb_logger)
+
+    def nondist_validation(self, dataloader, current_iter, tb_logger, save_img):
+        dataset = dataloader.dataset
+        dataset_name = dataset.opt['name']
+        with_metrics = self.opt['val'].get('metrics') is not None
+        use_pbar = self.opt['val'].get('pbar', False)
+
+        if with_metrics:
+            if not hasattr(self, 'metric_results'):  # only execute in the first run
+                self.metric_results = {}
+                for idx in range(len(self.common_stat['index_gt'])):
+                    self.metric_results.update({metric + '_' + self.common_stat['listofVar'][idx]: 0 for metric in self.opt['val']['metrics'].keys()})
+            # initialize the best metric results for each dataset_name (supporting multiple validation datasets)
+            self._initialize_best_metric_results(dataset_name)
+            self.metric_results = {metric: 0 for metric in self.metric_results}
+
+        metric_data = dict()
+        if use_pbar:
+            pbar = tqdm(total=len(dataset), unit='image')
+
+        for didx in range(len(dataset)):
+            val_data = dataset[didx]
+            for key in val_data.keys():
+                if key != 'info':
+                    val_data[key].unsqueeze_(0)
+            self.feed_data(val_data)
+            self.test()
+
+            c, h, w = self.gt.shape[-3:]
+            output = self.output.reshape(-1, c, h, w)
+            # Clip to ±4σ in normalized space before denormalization
+            output = torch.clamp(output, -4.0, 4.0)
+            target = self.gt.reshape(-1, c, h, w)
+            if isinstance(self.lq, dict):
+                if 'lq' in self.lq:
+                    images = self.lq['lq']
+                elif 'lq_seq' in self.lq:
+                    images = self.lq['lq_seq'][:, -1]
+            else:
+                images = self.lq
+
+            image = images[:, self.common_stat['index_gt']]
+            image = F.interpolate(
+                image, size=output.shape[-2:], mode="bicubic", align_corners=False)
+
+            if self.common_stat['normalize'] == 'minmax':
+                for idx in range(len(self.common_stat['index_gt'])):
+                    max_temp = self.var_stats_dict[self.common_stat['varName_gt'][idx]]['max']
+                    min_temp = self.var_stats_dict[self.common_stat['varName_gt'][idx]]['min']
+                    output[:, idx] = output[:, idx] * (max_temp - min_temp) + min_temp
+                    target[:, idx] = target[:, idx] * (max_temp - min_temp) + min_temp
+                    image[:, idx] = image[:, idx] * (max_temp - min_temp) + min_temp
+            elif self.common_stat['normalize'] == 'zscore':
+                for idx in range(len(self.common_stat['index_gt'])):
+                    mean_tmp = self.var_stats_dict[self.common_stat['varName_gt'][idx]]['mean']
+                    std_tmp = torch.sqrt(self.var_stats_dict[self.common_stat['varName_gt'][idx]]['var'])
+                    output[:, idx] = output[:, idx] * std_tmp + mean_tmp
+                    target[:, idx] = target[:, idx] * std_tmp + mean_tmp
+                    image[:, idx] = image[:, idx] * std_tmp + mean_tmp
+            else:
+                raise ValueError(f'the normalization operator {self.common_stat["normalize"]} is not implemented')
+
+            metric_data['img'] = output
+            if hasattr(self, 'gt'):
+                metric_data['img2'] = target
+            # tentative for out of GPU memory
+            save_npy = self.opt['val'].get('save_npy', False)
+            if save_img or self.opt['val'].get('save_img_train', 0) or save_npy:
+                if save_img or (save_npy and didx < 50) or (current_iter >= self.opt['val'].get('save_img_train', 0) and didx < 10):
+                    swh = self.opt['val'].get('save_img_wh', 1000)
+                    images_np = image.squeeze(0).cpu().numpy()[..., :swh, :swh]
+                    targets_np = target[[-1]].squeeze(0).cpu().numpy()[..., :swh, :swh]
+                    outputs_np = output[[-1]].squeeze(0).cpu().numpy()[..., :swh, :swh]
+                    file_name = self.info[0] if (hasattr(self, 'info') and self.info) else str(didx)
+                    _parts = file_name.split('_')
+                    if len(_parts) == 3:
+                        area, base_time, lead_time = _parts
+                    else:
+                        area, base_time, lead_time = file_name, file_name, '0'
+
+                    if save_npy:
+                        if self.opt['val'].get('save_npy_onlyoutput', False):
+                            save_res = outputs_np
+                            if len(save_res) == 1:
+                                save_res = save_res.squeeze(0)
+                        else:
+                            lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix_cut_obs', f'{area}_LAT.npy'))[:swh, :swh]
+                            lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix_cut_obs', f'{area}_LON.npy'))[:swh, :swh]
+                            save_res = np.concatenate([lat_out[np.newaxis], lon_out[np.newaxis], images_np, outputs_np, targets_np], axis=0)
+                        save_res_path = os.path.join(self.opt['path']['visualization'].replace('visualization', 'npy'), file_name + '.npy')
+                        os.makedirs(os.path.dirname(save_res_path), exist_ok=True)
+                        np.save(save_res_path, save_res)
+
+            if with_metrics:
+                # calculate metrics
+                for name, opt_ in self.opt['val']['metrics'].items():
+                    for idx in range(len(self.common_stat['index_gt'])):
+                        metric_res = calculate_metric(metric_data, opt_)
+                        self.metric_results[name + '_' + self.common_stat['listofVar'][idx]] += metric_res[idx]
+
+            if use_pbar:
+                pbar.update(1)
+                pbar.set_description(f'Test {self.info[0] if (hasattr(self, "info") and self.info) else didx}')
+
+        if use_pbar:
+            pbar.close()
+
+        if with_metrics:
+            for metric in self.metric_results.keys():
+                self.metric_results[metric] /= len(dataset)
+                # update the best metric result
+                self._update_best_metric_result(dataset_name, metric, self.metric_results[metric], current_iter)
+            self._log_validation_metric_values(current_iter, dataset_name, tb_logger)
+
 
 @MODEL_REGISTRY.register()
 class ClimateSRAddHGTModel(ClimateSRModel):
