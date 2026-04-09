@@ -432,9 +432,13 @@ class ClimateUformer(nn.Module):
         )
 
         # upsample
-        self.conv_before_upsample = nn.Sequential(
-                nn.Conv2d(embed_dim, 64, 3, 1, 1), nn.LeakyReLU(inplace=True))
-        self.upsample = SR_Upsample(upscale, 64)
+        #self.conv_before_upsample = nn.Sequential(
+        #        nn.Conv2d(embed_dim, 64, 3, 1, 1), nn.LeakyReLU(inplace=True))
+        #self.upsample = SR_Upsample(upscale, 64)
+        self.upsample = nn.Sequential(
+          nn.Conv2d(64, 4 * 64, 3, 1, 1),
+          nn.PixelShuffle(2)
+        )
         self.conv_after_body = nn.Conv2d(embed_dim, embed_dim, 3, 1, 1)
         self.conv_last = nn.Conv2d(64, num_out_ch, 3, 1, 1)
         # activation function
@@ -628,10 +632,10 @@ class ClimateUformerMultiScaleHGT(nn.Module):
             nn.Conv2d(64, 4 * 64, 3, 1, 1),
             nn.PixelShuffle(2)
         )
-        self.sa_upsample_2 = nn.Sequential(
-            nn.Conv2d(64, 25 * 64, 3, 1, 1),
-            nn.PixelShuffle(5)
-        )
+        #self.sa_upsample_2 = nn.Sequential(
+        #    nn.Conv2d(64, 25 * 64, 3, 1, 1),
+        #    nn.PixelShuffle(5)
+        #)
         if self.has_input_output_proj:
             self.conv_after_body = nn.Conv2d(embed_dim, embed_dim, 3, 1, 1)
         else:
@@ -729,7 +733,7 @@ class ClimateUformerMultiScaleHGT(nn.Module):
         out = self.sa_upsample_1(out)
         if self.add_hgt and self.multi_add_pos == 'decoder':
             out = out + hgt_feat[0]
-        out = self.sa_upsample_2(out)
+        #out = self.sa_upsample_2(out)
         #out = self.upsample(out)
         out = self.conv_last(out)
         return self.act(out)
@@ -913,10 +917,10 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
             nn.PixelShuffle(2)
         )
         #self.scale3_outconv = nn.Conv2d(64, 64, 3, 1, 1)
-        self.sa_upsample_2 = nn.Sequential(
-            nn.Conv2d(64, 25 * 64, 3, 1, 1),
-            nn.PixelShuffle(5)
-        )
+        #self.sa_upsample_2 = nn.Sequential(
+        #    nn.Conv2d(64, 25 * 64, 3, 1, 1),
+        #    nn.PixelShuffle(5)
+        #)
         if self.has_input_output_proj:
             self.conv_after_body = nn.Conv2d(embed_dim, embed_dim, 3, 1, 1)
         else:
@@ -1027,7 +1031,7 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         #out3 = self.scale3_outconv(out)
         if self.add_hgt and self.multi_add_pos == 'decoder':
             out = out + hgt_feat[0]
-        out = self.sa_upsample_2(out)
+        #out = self.sa_upsample_2(out)
         
         #out = self.upsample(out)
         out4 = self.scale4_outconv(out)

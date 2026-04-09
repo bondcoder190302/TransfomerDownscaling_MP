@@ -215,9 +215,9 @@ class MergeDataset(RadarDataset):
             target_data, radar_data, hgt_obs_data = \
                 augment([target_data, radar_data, hgt_obs_data], self.opt['use_flip'], self.opt['use_rot'])
 
-        target_data = torch.from_numpy(np.ascontiguousarray(target_data))
-        radar_data = torch.from_numpy(np.ascontiguousarray(radar_data))
-        hgt_obs_data = torch.from_numpy(np.ascontiguousarray(hgt_obs_data))
+        target_data = torch.from_numpy(np.ascontiguousarray(target_data)).float()
+        radar_data = torch.from_numpy(np.ascontiguousarray(radar_data)).float()
+        hgt_obs_data = torch.from_numpy(np.ascontiguousarray(hgt_obs_data)).float()
 
         info = [time]
         return {'lq': radar_data, 'gt': target_data, 'hgt': hgt_obs_data, 'info': info}

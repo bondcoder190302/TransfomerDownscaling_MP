@@ -7,7 +7,7 @@
 name: Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
 model_type: ClimateUformerModel
 scale: 2
-num_gpu: 1  # set num_gpu: 0 for cpu mode
+num_gpu: 0  # set num_gpu: 0 for cpu mode
 manual_seed: 0
 fp16: false
 
@@ -34,7 +34,6 @@ datasets:
     fix_file_name: 'HGT_fix.npy'
     seq_length: 1
     seq_interval: 1
-
   train:
     train_file: ./DownScale_Paper/DownScale_Correction_split/train_12_36.txt
     # dataloader
@@ -48,19 +47,21 @@ datasets:
     prefetch_mode: ~
 
   val:
+    seq_interval: 1
     train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
 
-  test_1:
-    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
+#  test:
+#    seq_interval: 1
+#    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
 
 # network structures
 network_g:
   type: ClimateUformerMultiScaleHGT
-  add_hgt: true
+  add_hgt: False
   upscale: 2
   num_in_ch: 1   # ERA5 precipitation (1 channel)
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
-  img_size: 40   # LR input spatial size (gt_size / scale = 80 / 2)
+  img_size: 32   # LR input spatial size (gt_size / scale = 80 / 2)
   window_size: 8
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128

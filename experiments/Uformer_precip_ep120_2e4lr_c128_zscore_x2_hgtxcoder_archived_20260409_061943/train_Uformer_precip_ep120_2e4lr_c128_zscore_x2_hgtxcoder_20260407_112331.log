@@ -1,0 +1,553 @@
+2026-04-07 11:23:31,473 INFO: 
+                ____                _       _____  ____
+               / __ ) ____ _ _____ (_)_____/ ___/ / __ \
+              / __  |/ __ `// ___// // ___/\__ \ / /_/ /
+             / /_/ // /_/ /(__  )/ // /__ ___/ // _, _/
+            /_____/ \__,_//____//_/ \___//____//_/ |_|
+     ______                   __   __                 __      __
+    / ____/____   ____   ____/ /  / /   __  __ _____ / /__   / /
+   / / __ / __ \ / __ \ / __  /  / /   / / / // ___// //_/  / /
+  / /_/ // /_/ // /_/ // /_/ /  / /___/ /_/ // /__ / /<    /_/
+  \____/ \____/ \____/ \____/  /_____/\____/ \___//_/|_|  (_)
+    
+Version Information: 
+	BasicSR: 1.4.2
+	PyTorch: 1.12.1+cu102
+	TorchVision: 0.13.1+cu102
+2026-04-07 11:23:31,474 INFO: 
+  name: Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
+  model_type: ClimateUformerModel
+  scale: 2
+  num_gpu: 0
+  manual_seed: 0
+  fp16: False
+  datasets:[
+    common:[
+      name: Precip
+      type: MergeDataset
+      dirName_stat: ./DownScale_Paper/param_stat_12_36/
+      dirName_data: ./DownScale_Paper/
+      listofVar: ['ERA5_precip_cut']
+      varName_gt: ['CHIRPS_precip_cut_obs']
+      index_gt: [0]
+      radar_file: ./DownScale_Paper/DownScale_Correction_split/data.txt
+      normalize: zscore
+      hgt_obs: HGT_fix_cut_obs
+      file_format: date
+      fix_file_name: HGT_fix.npy
+      seq_length: 1
+      seq_interval: 1
+      phase: common
+      scale: 2
+    ]
+    train:[
+      train_file: ./DownScale_Paper/DownScale_Correction_split/train_12_36.txt
+      use_shuffle: True
+      num_worker_per_gpu: 2
+      batch_size_per_gpu: 4
+      dataset_enlarge_ratio: 1
+      randomcrop: False
+      gt_size: 80
+      prefetch_mode: None
+      phase: train
+      scale: 2
+    ]
+    val:[
+      seq_interval: 1
+      train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
+      phase: val
+      scale: 2
+    ]
+  ]
+  network_g:[
+    type: ClimateUformerMultiScaleHGT
+    add_hgt: False
+    upscale: 2
+    num_in_ch: 1
+    num_out_ch: 1
+    img_size: 40
+    window_size: 8
+    depths: [2, 2, 2, 2, 2]
+    embed_dim: 128
+    num_heads: [4, 8, 16, 16, 8]
+    mlp_ratio: 4
+    token_projection: linear
+    token_mlp: leff
+    activation: none
+    multi_add_pos: xcoder
+  ]
+  path:[
+    pretrain_network_g: None
+    strict_load_g: True
+    resume_state: None
+    experiments_root: /home/vipult/TransfomerDownscaling_MP/experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
+    models: /home/vipult/TransfomerDownscaling_MP/experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder/models
+    training_states: /home/vipult/TransfomerDownscaling_MP/experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder/training_states
+    log: /home/vipult/TransfomerDownscaling_MP/experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
+    visualization: /home/vipult/TransfomerDownscaling_MP/experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder/visualization
+  ]
+  train:[
+    optim_g:[
+      type: Adam
+      lr: 0.0002
+      betas: [0.9, 0.99]
+    ]
+    scheduler:[
+      type: MultiStepLR
+      milestones: [1140, 1824, 2052, 2166]
+      gamma: 0.5
+    ]
+    total_iter: 2280
+    warmup_iter: -1
+    pixel_opt:[
+      type: CharbonnierLoss
+      loss_weight: 10
+      reduction: mean
+    ]
+  ]
+  val:[
+    val_freq: 19
+    save_img: False
+    save_npy: True
+    save_npy_onlyoutput: True
+    pbar: True
+    metrics:[
+      psnr:[
+        type: calculate_climate_psnr
+        crop_border: 0
+      ]
+      mse:[
+        type: calculate_climate_mse
+        crop_border: 0
+        better: lower
+      ]
+      mae:[
+        type: calculate_climate_mae
+        crop_border: 0
+        better: lower
+      ]
+    ]
+  ]
+  logger:[
+    print_freq: 10
+    save_checkpoint_freq: 190
+    use_tb_logger: True
+  ]
+  dist_params:[
+    backend: nccl
+    port: 29500
+  ]
+  dist: False
+  rank: 0
+  world_size: 1
+  auto_resume: False
+  is_train: True
+  root_path: /home/vipult/TransfomerDownscaling_MP
+
+2026-04-07 11:23:32,756 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/ERA5_precip_stat.pkl
+
+2026-04-07 11:23:33,105 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/CHIRPS_precip_obs_stat.pkl
+
+2026-04-07 11:23:33,115 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/HGT_obs_stat.pkl
+
+2026-04-07 11:23:33,127 INFO: Dataset [MergeDataset] - Precip is built.
+2026-04-07 11:23:33,128 INFO: Training statistics:
+	Number of train images: 74
+	Dataset enlarge ratio: 1
+	Batch size per gpu: 4
+	World size (gpu number): 1
+	Require iter number per epoch: 19
+	Total epochs: 120; iters: 2280.
+2026-04-07 11:23:33,148 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/ERA5_precip_stat.pkl
+
+2026-04-07 11:23:33,149 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/CHIRPS_precip_obs_stat.pkl
+
+2026-04-07 11:23:33,149 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/HGT_obs_stat.pkl
+
+2026-04-07 11:23:33,149 INFO: Dataset [MergeDataset] - Precip is built.
+2026-04-07 11:23:33,149 INFO: Number of val images/folders in Precip: 9
+2026-04-07 11:23:34,406 INFO: Network [ClimateUformerMultiScaleHGT] is created.
+2026-04-07 11:23:34,454 INFO: Network: ClimateUformerMultiScaleHGT, with parameters: 21,172,265
+2026-04-07 11:23:34,454 INFO: ClimateUformerMultiScaleHGT(
+  embed_dim=128, token_projection=linear, token_mlp=leff,win_size=8
+  (pos_drop): Dropout(p=0.0, inplace=False)
+  (encoderlayer_0): BasicUformerLayer(
+    dim=128, input_resolution=(40, 40), depth=2
+    (blocks): ModuleList(
+      (0): LeWinTransformerBlock(
+        dim=128, input_resolution=(40, 40), num_heads=4, win_size=8, shift_size=0, mlp_ratio=4
+        (norm1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=128, win_size=(8, 8), num_heads=4
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=128, out_features=128, bias=True)
+            (to_kv): Linear(in_features=128, out_features=256, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=128, out_features=128, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): Identity()
+        (norm2): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=128, out_features=512, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=512)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=512, out_features=128, bias=True)
+          )
+        )
+      )
+      (1): LeWinTransformerBlock(
+        dim=128, input_resolution=(40, 40), num_heads=4, win_size=8, shift_size=4, mlp_ratio=4
+        (norm1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=128, win_size=(8, 8), num_heads=4
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=128, out_features=128, bias=True)
+            (to_kv): Linear(in_features=128, out_features=256, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=128, out_features=128, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.033)
+        (norm2): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=128, out_features=512, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=512)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=512, out_features=128, bias=True)
+          )
+        )
+      )
+    )
+  )
+  (dowsample_0): Downsample(
+    (conv): Sequential(
+      (0): Conv2d(128, 256, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+    )
+  )
+  (encoderlayer_1): BasicUformerLayer(
+    dim=256, input_resolution=(20, 20), depth=2
+    (blocks): ModuleList(
+      (0): LeWinTransformerBlock(
+        dim=256, input_resolution=(20, 20), num_heads=8, win_size=8, shift_size=0, mlp_ratio=4
+        (norm1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=256, win_size=(8, 8), num_heads=8
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=256, out_features=256, bias=True)
+            (to_kv): Linear(in_features=256, out_features=512, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=256, out_features=256, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.067)
+        (norm2): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=256, out_features=1024, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(1024, 1024, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=1024)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=1024, out_features=256, bias=True)
+          )
+        )
+      )
+      (1): LeWinTransformerBlock(
+        dim=256, input_resolution=(20, 20), num_heads=8, win_size=8, shift_size=4, mlp_ratio=4
+        (norm1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=256, win_size=(8, 8), num_heads=8
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=256, out_features=256, bias=True)
+            (to_kv): Linear(in_features=256, out_features=512, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=256, out_features=256, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.100)
+        (norm2): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=256, out_features=1024, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(1024, 1024, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=1024)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=1024, out_features=256, bias=True)
+          )
+        )
+      )
+    )
+  )
+  (dowsample_1): Downsample(
+    (conv): Sequential(
+      (0): Conv2d(256, 512, kernel_size=(4, 4), stride=(2, 2), padding=(1, 1))
+    )
+  )
+  (conv): BasicUformerLayer(
+    dim=512, input_resolution=(10, 10), depth=2
+    (blocks): ModuleList(
+      (0): LeWinTransformerBlock(
+        dim=512, input_resolution=(10, 10), num_heads=16, win_size=8, shift_size=0, mlp_ratio=4
+        (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=512, win_size=(8, 8), num_heads=16
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=512, out_features=512, bias=True)
+            (to_kv): Linear(in_features=512, out_features=1024, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=512, out_features=512, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.100)
+        (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=512, out_features=2048, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(2048, 2048, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=2048)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=2048, out_features=512, bias=True)
+          )
+        )
+      )
+      (1): LeWinTransformerBlock(
+        dim=512, input_resolution=(10, 10), num_heads=16, win_size=8, shift_size=4, mlp_ratio=4
+        (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=512, win_size=(8, 8), num_heads=16
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=512, out_features=512, bias=True)
+            (to_kv): Linear(in_features=512, out_features=1024, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=512, out_features=512, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.100)
+        (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=512, out_features=2048, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(2048, 2048, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=2048)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=2048, out_features=512, bias=True)
+          )
+        )
+      )
+    )
+  )
+  (upsample_0): Upsample(
+    (deconv): Sequential(
+      (0): ConvTranspose2d(512, 256, kernel_size=(2, 2), stride=(2, 2))
+    )
+  )
+  (decoderlayer_0): BasicUformerLayer(
+    dim=512, input_resolution=(20, 20), depth=2
+    (blocks): ModuleList(
+      (0): LeWinTransformerBlock(
+        dim=512, input_resolution=(20, 20), num_heads=16, win_size=8, shift_size=0, mlp_ratio=4
+        (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=512, win_size=(8, 8), num_heads=16
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=512, out_features=512, bias=True)
+            (to_kv): Linear(in_features=512, out_features=1024, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=512, out_features=512, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.100)
+        (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=512, out_features=2048, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(2048, 2048, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=2048)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=2048, out_features=512, bias=True)
+          )
+        )
+      )
+      (1): LeWinTransformerBlock(
+        dim=512, input_resolution=(20, 20), num_heads=16, win_size=8, shift_size=4, mlp_ratio=4
+        (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=512, win_size=(8, 8), num_heads=16
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=512, out_features=512, bias=True)
+            (to_kv): Linear(in_features=512, out_features=1024, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=512, out_features=512, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.067)
+        (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=512, out_features=2048, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(2048, 2048, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=2048)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=2048, out_features=512, bias=True)
+          )
+        )
+      )
+    )
+  )
+  (upsample_1): Upsample(
+    (deconv): Sequential(
+      (0): ConvTranspose2d(512, 128, kernel_size=(2, 2), stride=(2, 2))
+    )
+  )
+  (decoderlayer_1): BasicUformerLayer(
+    dim=256, input_resolution=(40, 40), depth=2
+    (blocks): ModuleList(
+      (0): LeWinTransformerBlock(
+        dim=256, input_resolution=(40, 40), num_heads=8, win_size=8, shift_size=0, mlp_ratio=4
+        (norm1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=256, win_size=(8, 8), num_heads=8
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=256, out_features=256, bias=True)
+            (to_kv): Linear(in_features=256, out_features=512, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=256, out_features=256, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): DropPath(drop_prob=0.033)
+        (norm2): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=256, out_features=1024, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(1024, 1024, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=1024)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=1024, out_features=256, bias=True)
+          )
+        )
+      )
+      (1): LeWinTransformerBlock(
+        dim=256, input_resolution=(40, 40), num_heads=8, win_size=8, shift_size=4, mlp_ratio=4
+        (norm1): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (attn): WindowAttention(
+          dim=256, win_size=(8, 8), num_heads=8
+          (qkv): LinearProjection(
+            (to_q): Linear(in_features=256, out_features=256, bias=True)
+            (to_kv): Linear(in_features=256, out_features=512, bias=True)
+          )
+          (attn_drop): Dropout(p=0.0, inplace=False)
+          (proj): Linear(in_features=256, out_features=256, bias=True)
+          (se_layer): Identity()
+          (proj_drop): Dropout(p=0.0, inplace=False)
+          (softmax): Softmax(dim=-1)
+        )
+        (drop_path): Identity()
+        (norm2): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+        (mlp): LeFF(
+          (linear1): Sequential(
+            (0): Linear(in_features=256, out_features=1024, bias=True)
+            (1): GELU(approximate=none)
+          )
+          (dwconv): Sequential(
+            (0): Conv2d(1024, 1024, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=1024)
+            (1): GELU(approximate=none)
+          )
+          (linear2): Sequential(
+            (0): Linear(in_features=1024, out_features=256, bias=True)
+          )
+        )
+      )
+    )
+  )
+  (conv_first): Conv2d(1, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (conv_before_upsample): Sequential(
+    (0): Conv2d(128, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (1): LeakyReLU(negative_slope=0.01, inplace=True)
+  )
+  (sa_upsample_1): Sequential(
+    (0): Conv2d(64, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (1): PixelShuffle(upscale_factor=2)
+  )
+  (sa_upsample_2): Sequential(
+    (0): Conv2d(64, 1600, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (1): PixelShuffle(upscale_factor=5)
+  )
+  (conv_after_body): Conv2d(256, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (conv_last): Conv2d(64, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  (act): Activation()
+)
+2026-04-07 11:23:34,455 INFO: Loss [CharbonnierLoss] is created.
+2026-04-07 11:23:34,456 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/ERA5_precip_stat.pkl
+
+2026-04-07 11:23:34,456 INFO: Load stat from ./DownScale_Paper/param_stat_12_36/CHIRPS_precip_obs_stat.pkl
+
+2026-04-07 11:23:34,457 INFO: Enable amp training: False
+2026-04-07 11:23:34,457 INFO: Model [ClimateUformerModel] is created.
+2026-04-07 11:23:34,620 INFO: Start training from epoch: 0, iter: 0
