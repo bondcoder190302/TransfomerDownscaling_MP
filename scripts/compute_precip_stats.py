@@ -36,10 +36,16 @@ LOG1P_TRANSFORM = False
 
 # Map from variable name (as used in the YAML config) to the directory that
 # holds the .npy files for that variable.
-VAR_DIRS = {
-    "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut"),
-    "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs"),
+#VAR_DIRS = {
+#    "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut"),
+#    "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs"),
     # For the static elevation layer there is only one file; point directly to it.
+#    "HGT_fix_cut_obs":       os.path.join(DATAROOT, "HGT_fix_cut_obs"),
+#}
+
+VAR_DIRS = {
+    "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut_log1p"),      # ← ADD _log1p
+    "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs_log1p"), # ← ADD _log1p
     "HGT_fix_cut_obs":       os.path.join(DATAROOT, "HGT_fix_cut_obs"),
 }
 
