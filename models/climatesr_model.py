@@ -181,6 +181,9 @@ class ClimateSRModel(SRModel):
             loss_dict['l_psd'] = l_psd
 
         self.scaler.scale(l_total).backward()
+        self.scaler.unscale_(self.optimizer_g)
+        # Clip gradients to prevent explosion and NaN loss
+        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=1.0)
         self.scaler.step(self.optimizer_g)
         self.scaler.update()
 
@@ -208,7 +211,7 @@ class ClimateSRModel(SRModel):
                 self.output = self.net_g(self.lq)
             self.net_g.train()
 
-    def _initialize_best_metric_results(self, dataset_name, metric_results):
+    def _initialize_best_metric_results(self, dataset_name):
         """Initialize the best metric results dict for recording the best metric value and iteration."""
         if hasattr(self, 'best_metric_results') and dataset_name in self.best_metric_results:
             return
@@ -217,7 +220,7 @@ class ClimateSRModel(SRModel):
 
         # add a dataset record
         record = dict()
-        for metric in metric_results.keys():
+        for metric in self.metric_results.keys():
             content = self.opt['val']['metrics'][metric.split('_')[0]]
             better = content.get('better', 'higher')
             init_val = float('-inf') if better == 'higher' else float('inf')
@@ -235,7 +238,7 @@ class ClimateSRModel(SRModel):
                 for idx in range(len(self.common_stat['index_gt'])):
                     self.metric_results.update({metric+'_'+self.common_stat['listofVar'][idx]: 0 for metric in self.opt['val']['metrics'].keys()})
             # initialize the best metric results for each dataset_name (supporting multiple validation datasets)
-            self._initialize_best_metric_results(dataset_name, self.metric_results)
+            self._initialize_best_metric_results(dataset_name)
         rank, world_size = get_dist_info()
         if with_metrics:
             self.metric_results = {metric: 0 for metric in self.metric_results}

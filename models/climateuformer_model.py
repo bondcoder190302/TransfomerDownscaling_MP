@@ -120,6 +120,9 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             loss_dict['l_pix_multi'] = l_pix_multi
 
         self.scaler.scale(l_total).backward()
+        self.scaler.unscale_(self.optimizer_g)
+        # Clip gradients to prevent explosion and NaN loss
+        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=1.0)
         self.scaler.step(self.optimizer_g)
         self.scaler.update()
 
