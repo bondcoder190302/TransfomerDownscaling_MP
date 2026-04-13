@@ -82,7 +82,7 @@ path:
 train:
   optim_g:
     type: Adam
-    lr: !!float 5e-5
+    lr: !!float 1e-5
     betas: [0.9, 0.99]
 
   # 74 training samples, batch_size=4 → 19 iter/epoch; 120 epochs → 2280 total_iter
@@ -103,7 +103,7 @@ train:
 
 # validation settings
 val:
-  val_freq: 19       # validate every epoch (19 iter/epoch)
+  val_freq: 190       # validate every epoch (19 iter/epoch)
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -116,11 +116,11 @@ val:
     mse:
       type: calculate_climate_mse
       crop_border: 0
-      better: lower
+      #better: lower
     mae:
       type: calculate_climate_mae
       crop_border: 0
-      better: lower
+      #better: lower
 
 # logging settings
 logger:
