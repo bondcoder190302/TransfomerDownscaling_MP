@@ -88,7 +88,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         else:
             self.net_g.eval()
             with torch.no_grad():
-                self.output = self.net_g(self.lq, None)
+                self.output = self.net_g(self.lq, mask)
             self.net_g.train()
 
         self.output = self.output[0][..., :h*scale, :w*scale]
@@ -107,15 +107,13 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             l_total += l_pix
             loss_dict['l_pix'] = l_pix
         if self.cri_pix_multiscale:
-            gt0 = F.interpolate(self.gt, scale_factor=1/(scale*4), mode='bilinear', align_corners=False)
-            gt1 = F.interpolate(self.gt, scale_factor=1/(scale*2), mode='bilinear', align_corners=False)
-            gt2 = F.interpolate(self.gt, scale_factor=1/(scale), mode='bilinear', align_corners=False)
-            gt3 = F.interpolate(self.gt, scale_factor=1/5, mode='bilinear', align_corners=False)
-            l_pix_0 = self.cri_pix_multiscale(self.output[1], gt0)
-            l_pix_1 = self.cri_pix_multiscale(self.output[2], gt1)
-            l_pix_2 = self.cri_pix_multiscale(self.output[3], gt2)
-            l_pix_3 = self.cri_pix_multiscale(self.output[4], gt3)
-            l_pix_multi = l_pix_0 + l_pix_1 + l_pix_2 + l_pix_3
+            # ClimateUformerMultiScaleHGTMultiScaleOut returns 4 outputs:
+            # (out, out0, out1, out2). out0/out1/out2 are already upsampled to
+            # the final spatial size before fusing, so compare all against self.gt.
+            l_pix_0 = self.cri_pix_multiscale(self.output[1], self.gt)
+            l_pix_1 = self.cri_pix_multiscale(self.output[2], self.gt)
+            l_pix_2 = self.cri_pix_multiscale(self.output[3], self.gt)
+            l_pix_multi = l_pix_0 + l_pix_1 + l_pix_2
             l_total += l_pix_multi
             loss_dict['l_pix_multi'] = l_pix_multi
 
