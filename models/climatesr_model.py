@@ -1,4 +1,5 @@
 import os
+from cv2 import data
 import torch
 from tqdm import tqdm
 import numpy as np
@@ -163,7 +164,7 @@ class ClimateSRModel(SRModel):
             logger = get_root_logger()
             logger.warning(f'NaN/Inf detected in model output at iter {current_iter}, skipping parameter update')
             return
-        # Clip to ±4s in normalized space to prevent extreme values from destabilizing loss
+        # Clip to ï¿½4s in normalized space to prevent extreme values from destabilizing loss
         self.output = torch.clamp(self.output, -4.0, 4.0)
         l_total = 0
         loss_dict = OrderedDict()
@@ -264,7 +265,7 @@ class ClimateSRModel(SRModel):
 
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h ,w)
-            # Clip to ±4s in normalized space before denormalization
+            # Clip to ï¿½4s in normalized space before denormalization
             output = torch.clamp(output, -4.0, 4.0)
             target = self.gt.reshape(-1, c, h ,w)
             if isinstance(self.lq, dict):
@@ -425,7 +426,7 @@ class ClimateSRModel(SRModel):
 
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h, w)
-            # Clip to ±4s in normalized space before denormalization
+            # Clip to ï¿½4s in normalized space before denormalization
             output = torch.clamp(output, -4.0, 4.0)
             target = self.gt.reshape(-1, c, h, w)
             if isinstance(self.lq, dict):
@@ -514,6 +515,15 @@ class ClimateSRModel(SRModel):
 
 @MODEL_REGISTRY.register()
 class ClimateSRAddHGTModel(ClimateSRModel):
+    # def feed_data(self, data):
+    #     hgt = data['hgt'].to(self.device)
+    #     lq = data['lq'].to(self.device)
+    #     self.lq = {'hgt': hgt, 'lq': lq}
+    #     if 'gt' in data:
+    #         targets = data['gt']
+    #         self.gt = targets.to(self.device)
+    #     self.info = data['info']
+    # check the data sanity
     def feed_data(self, data):
         hgt = data['hgt'].to(self.device)
         lq = data['lq'].to(self.device)
@@ -522,3 +532,20 @@ class ClimateSRAddHGTModel(ClimateSRModel):
             targets = data['gt']
             self.gt = targets.to(self.device)
         self.info = data['info']
+
+        # --- data sanity checks ---
+        def _check_tensor(name, x):
+            if not torch.isfinite(x).all():
+                bad_nan = torch.isnan(x).any().item()
+                bad_inf = torch.isinf(x).any().item()
+                mn = torch.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0).min().item()
+                mx = torch.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0).max().item()
+                raise ValueError(
+                    f'Invalid tensor {name}: has_nan={bad_nan}, has_inf={bad_inf}, '
+                    f'min={mn:.6f}, max={mx:.6f}, info={self.info}'
+                )
+
+        _check_tensor('lq', self.lq['lq'])
+        _check_tensor('hgt', self.lq['hgt'])
+        if hasattr(self, 'gt'):
+            _check_tensor('gt', self.gt)

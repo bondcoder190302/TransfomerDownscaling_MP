@@ -111,6 +111,8 @@ class MergeDataset(RadarDataset):
         elif self.normalize == 'zscore':
             mean_tmp = self.var_stats_dict[varName]['mean'].numpy()
             std_tmp = np.sqrt(self.var_stats_dict[varName]['var'].numpy())
+            #adding one line to avoid zero division
+            std_tmp = np.maximum(std_tmp, 1e-6)
             data = (data - mean_tmp) / std_tmp
         else:
             raise ValueError(f'the normalization operator {self.normalize} is not implemented')
