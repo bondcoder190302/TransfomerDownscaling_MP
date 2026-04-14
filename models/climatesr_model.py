@@ -163,7 +163,7 @@ class ClimateSRModel(SRModel):
             logger = get_root_logger()
             logger.warning(f'NaN/Inf detected in model output at iter {current_iter}, skipping parameter update')
             return
-        # Clip to Â±4s in normalized space to prevent extreme values from destabilizing loss
+        # Clip to ±4s in normalized space to prevent extreme values from destabilizing loss
         self.output = torch.clamp(self.output, -4.0, 4.0)
         l_total = 0
         loss_dict = OrderedDict()
@@ -264,7 +264,7 @@ class ClimateSRModel(SRModel):
 
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h ,w)
-            # Clip to Â±4s in normalized space before denormalization
+            # Clip to ±4s in normalized space before denormalization
             output = torch.clamp(output, -4.0, 4.0)
             target = self.gt.reshape(-1, c, h ,w)
             if isinstance(self.lq, dict):
@@ -425,7 +425,7 @@ class ClimateSRModel(SRModel):
 
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h, w)
-            # Clip to Â±4s in normalized space before denormalization
+            # Clip to ±4s in normalized space before denormalization
             output = torch.clamp(output, -4.0, 4.0)
             target = self.gt.reshape(-1, c, h, w)
             if isinstance(self.lq, dict):
@@ -522,4 +522,3 @@ class ClimateSRAddHGTModel(ClimateSRModel):
             targets = data['gt']
             self.gt = targets.to(self.device)
         self.info = data['info']
-        
