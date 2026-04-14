@@ -1,7 +1,7 @@
 # Configuration for single-variable precipitation downscaling.
-# Input : ERA5 Land daily precipitation at 0.1° (40×40 for region [76,21,80,25])
-# Target: CHIRPS daily precipitation at 0.05° (80×80)
-# Auxiliary: Copernicus GLO-90 DEM elevation (80×80, static)
+# Input : ERA5 Land daily precipitation at 0.1° (36x36 for region [76,21,79.2,24.2])
+# Target: CHIRPS daily precipitation at 0.05° (64x64)
+# Auxiliary: Copernicus GLO-90 DEM elevation (64x64, static)
 # Scale factor: 2× (0.1° → 0.05°)
 
 name: Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
@@ -42,7 +42,7 @@ datasets:
     batch_size_per_gpu: 4
     dataset_enlarge_ratio: 1
     randomcrop: false
-    # Full HR image size (80 px at 0.05°); LQ crop = gt_size / scale = 40
+    # Full HR image size (64 px at 0.05°); LQ crop = gt_size / scale = 36
     gt_size: 64
     prefetch_mode: ~
 
@@ -61,7 +61,7 @@ network_g:
   upscale: 2
   num_in_ch: 1   # ERA5 precipitation (1 channel)
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
-  img_size: 32   # LR input spatial size (gt_size / scale = 80 / 2)
+  img_size: 32   # LR input spatial size (gt_size / scale = 64 / 2)
   window_size: 8
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
