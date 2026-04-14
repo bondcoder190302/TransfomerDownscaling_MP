@@ -600,13 +600,20 @@ class ClimateUformerMultiScaleHGT(nn.Module):
         if self.add_hgt:
             self.hgt_layer = nn.ModuleList()
             self.hgt_layer.append(nn.Sequential(
-                nn.Conv2d(1, 2, 3, 1, 1),
-                nn.PixelUnshuffle(5),
+                nn.Conv2d(1, 32, 3, 1, 1),
+                nn.PixelUnshuffle(2),  # 64 -> 32
                 nn.LeakyReLU(negative_slope=0.1, inplace=True),
-                nn.Conv2d(50, embed_dim // 4, 3, 1, 1),
-                nn.PixelUnshuffle(2),
+                nn.Conv2d(128, embed_dim, 3, 1, 1),  # 32*4 = 128 channels after unshuffle
                 nn.LeakyReLU(negative_slope=0.1, inplace=True),
             ))
+            #self.hgt_layer.append(nn.Sequential(
+            #    nn.Conv2d(1, 2, 3, 1, 1),
+            #    nn.PixelUnshuffle(5),
+            #    nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            #    nn.Conv2d(50, embed_dim // 4, 3, 1, 1),
+            #    nn.PixelUnshuffle(2),
+            #    nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            #))
             self.hgt_layer.append(nn.Sequential(
                 nn.Conv2d(embed_dim, embed_dim*2, kernel_size=4, stride=2, padding=1),
                 nn.LeakyReLU(negative_slope=0.1, inplace=True),
@@ -701,7 +708,7 @@ class ClimateUformerMultiScaleHGT(nn.Module):
         if self.add_hgt and self.multi_add_pos == 'encoder':
             pool1 = pool1 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous()
         if self.add_hgt and self.multi_add_pos == 'decoder':
-            pool1 = pool1 + hgt_feat[3].flatten(2).transpose(1, 2).contiguous()
+            pool1 = pool1 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous() #was hgt_feat[3] as pixshuf was 5
         # Bottleneck
         conv2 = self.conv(pool1, mask=mask)
         if self.add_hgt and self.multi_add_pos == 'xcoder':
@@ -995,7 +1002,7 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         if self.add_hgt and self.multi_add_pos == 'encoder':
             pool1 = pool1 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous()
         if self.add_hgt and self.multi_add_pos == 'decoder':
-            pool1 = pool1 + hgt_feat[3].flatten(2).transpose(1, 2).contiguous()
+            pool1 = pool1 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous() #was hgt_feat[3] as pixshuf was 5
         # Bottleneck
         conv2 = self.conv(pool1, mask=mask)
         if self.add_hgt and self.multi_add_pos == 'xcoder':
