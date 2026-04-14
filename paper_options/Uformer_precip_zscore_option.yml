@@ -5,7 +5,7 @@
 # Scale factor: 2× (0.1° → 0.05°)
 
 name: Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
-model_type: ClimateUformerModel
+model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
 num_gpu: 0  # set num_gpu: 0 for cpu mode
 manual_seed: 0
@@ -56,8 +56,8 @@ datasets:
 
 # network structures
 network_g:
-  type: ClimateUformerMultiScaleHGT
-  add_hgt: False
+  type: ClimateUformerMultiScaleHGTMultiScaleOut
+  add_hgt: True
   upscale: 2
   num_in_ch: 1   # ERA5 precipitation (1 channel)
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
