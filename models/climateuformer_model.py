@@ -7,6 +7,7 @@ from collections import OrderedDict
 import torch.nn.functional as F
 from .climatesr_model import ClimateSRModel, ClimateSRAddHGTModel
 from basicsr.utils.registry import MODEL_REGISTRY
+from basicsr.utils import get_root_logger
 from basicsr.metrics import calculate_metric
 from Plot.pcolor_map_one import pcolor_map_one_python as pcolor_map_one
 from basicsr.utils.dist_util import get_dist_info
@@ -94,16 +95,33 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         self.output = self.output[0][..., :h*scale, :w*scale]
 
     def optimize_parameters(self, current_iter):
+        logger = get_root_logger()
         self.optimizer_g.zero_grad()
         with torch.cuda.amp.autocast(enabled=self.amp_training):
             self.output = self.net_g(self.lq)
         self.output = [v.float() for v in self.output]
+
+        # NaN/Inf guard on network outputs
+        for idx, out_tensor in enumerate(self.output):
+            if not torch.isfinite(out_tensor).all():
+                logger.warning(
+                    f'NaN/Inf in network output[{idx}] at iter {current_iter}, skipping update'
+                )
+                return
+
+        # Clamp outputs to z-score range; precipitation z-scores rarely exceed ±4σ
+        self.output = [v.clamp(-4.0, 4.0) for v in self.output]
+
         l_total = 0
         loss_dict = OrderedDict()
         # pixel loss
-        scale = self.opt.get('scale')
         if self.cri_pix:
             l_pix = self.cri_pix(self.output[0], self.gt)
+            if not torch.isfinite(l_pix):
+                logger.warning(
+                    f'NaN/Inf in l_pix at iter {current_iter}, skipping update'
+                )
+                return
             l_total += l_pix
             loss_dict['l_pix'] = l_pix
         if self.cri_pix_multiscale:
@@ -114,8 +132,19 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             l_pix_1 = self.cri_pix_multiscale(self.output[2], self.gt)
             l_pix_2 = self.cri_pix_multiscale(self.output[3], self.gt)
             l_pix_multi = l_pix_0 + l_pix_1 + l_pix_2
+            if not torch.isfinite(l_pix_multi):
+                logger.warning(
+                    f'NaN/Inf in l_pix_multi at iter {current_iter}, skipping update'
+                )
+                return
             l_total += l_pix_multi
             loss_dict['l_pix_multi'] = l_pix_multi
+
+        if not torch.isfinite(l_total):
+            logger.warning(
+                f'NaN/Inf in total loss at iter {current_iter}, skipping update'
+            )
+            return
 
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer_g)
