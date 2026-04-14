@@ -5,19 +5,18 @@ by MergeDataset.init_stat().
 Stat file naming convention (matches the dataset code):
   varName.replace("_cut","").replace("_fix","") + "_stat.pkl"
 
-  ERA5_precip_cut      → ERA5_precip_stat.pkl
-  CHIRPS_precip_cut_obs → CHIRPS_precip_obs_stat.pkl
-  HGT_fix_cut_obs      → HGT_obs_stat.pkl
+  ERA5_precip_cut_log1p       → ERA5_precip_log1p_stat.pkl
+  CHIRPS_precip_cut_obs_log1p → CHIRPS_precip_obs_log1p_stat.pkl
+  HGT_fix_cut_obs             → HGT_obs_stat.pkl
 
 Usage (run from the repository root):
     python scripts/compute_precip_stats.py
 
 Note on precipitation skewness:
-  Precipitation distributions are heavily right-skewed (many zeros, rare large
-  values). A log1p transform (log(1+x)) before fitting z-score statistics can
-  improve normalization. Set LOG1P_TRANSFORM = True below to enable it; the same
-  transform must then be applied to your data before loading (i.e. pre-process the
-  .npy files with log1p before saving them to disk).
+  The .npy files under *_log1p directories are already log1p-transformed (produced
+  by scripts/apply_log1p_transform.py). Set LOG1P_TRANSFORM = False (default) when
+  pointing VAR_DIRS at those directories so the transform is not applied twice.
+  Set LOG1P_TRANSFORM = True only when pointing at raw (untransformed) directories.
 """
 
 import glob
@@ -36,17 +35,21 @@ LOG1P_TRANSFORM = False
 
 # Map from variable name (as used in the YAML config) to the directory that
 # holds the .npy files for that variable.
-#VAR_DIRS = {
-#    "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut"),
-#    "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs"),
-    # For the static elevation layer there is only one file; point directly to it.
-#    "HGT_fix_cut_obs":       os.path.join(DATAROOT, "HGT_fix_cut_obs"),
-#}
+# Keys must exactly match the YAML listofVar / varName_gt values so that
+# stat_filename() produces the correct output filenames.
+#
+# Raw-data variant (set LOG1P_TRANSFORM = True to apply log1p on the fly):
+# VAR_DIRS = {
+#     "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut"),
+#     "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs"),
+#     "HGT_fix_cut_obs":       os.path.join(DATAROOT, "HGT_fix_cut_obs"),
+# }
 
+# Log1p-pre-transformed variant (LOG1P_TRANSFORM = False, data already transformed):
 VAR_DIRS = {
-    "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut_log1p"),      # ← ADD _log1p
-    "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs_log1p"), # ← ADD _log1p
-    "HGT_fix_cut_obs":       os.path.join(DATAROOT, "HGT_fix_cut_obs"),
+    "ERA5_precip_cut_log1p":       os.path.join(DATAROOT, "ERA5_precip_cut_log1p"),
+    "CHIRPS_precip_cut_obs_log1p": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs_log1p"),
+    "HGT_fix_cut_obs":             os.path.join(DATAROOT, "HGT_fix_cut_obs"),
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
