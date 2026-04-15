@@ -120,8 +120,8 @@ class MyUformer_depth5(nn.Module):
                             norm_layer=norm_layer,
                             use_checkpoint=use_checkpoint,
                             token_projection=token_projection,token_mlp=token_mlp,se_layer=se_layer)
-
-        self.apply(self._init_weights)
+        # commented out to Disable custom init for Uformer blocks 
+        #self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -311,8 +311,8 @@ class MyUformer_depth7(nn.Module):
                             norm_layer=norm_layer,
                             use_checkpoint=use_checkpoint,
                             token_projection=token_projection,token_mlp=token_mlp,se_layer=se_layer)
-
-        self.apply(self._init_weights)
+        # commented out to Disable custom init for Uformer blocks
+        #self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -650,8 +650,8 @@ class ClimateUformerMultiScaleHGT(nn.Module):
         self.conv_last = nn.Conv2d(64, num_out_ch, 3, 1, 1)
         # activation function
         self.act = Activation(activation)
-
-        self.apply(self._init_weights)
+        # commented out to Disable custom init for Uformer blocks
+        #self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -944,8 +944,8 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         self.conv_fuse = nn.Conv2d(64 * 4, 64, 3, 1, 1)
         # activation function
         self.act = Activation(activation)
-
-        self.apply(self._init_weights)
+        # commented out to Disable custom init for Uformer blocks
+        #self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
