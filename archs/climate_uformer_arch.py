@@ -972,15 +972,27 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         hgt = x_in['hgt']
         b, c, h, w = x.shape
 
+        def _assert_finite(name, t):
+            if not torch.isfinite(t).all():
+                raise RuntimeError(
+                    f'Non-finite values at stage "{name}", shape={tuple(t.shape)}'
+                )
+
+        _assert_finite('input_lq', x)
+        _assert_finite('input_hgt', hgt)
+
         feat = self.conv_first(x)
+        _assert_finite('conv_first', feat)
 
         if self.add_hgt:
             hgt_feat = []
             for layer in self.hgt_layer:
                 hgt = layer(hgt)
                 hgt_feat.append(hgt)
+                _assert_finite(f'hgt_layer_{len(hgt_feat) - 1}', hgt)
             for i, layer in enumerate(self.hgt_conv):
                 hgt_feat[i] = layer(hgt_feat[i])
+                _assert_finite(f'hgt_conv_{i}', hgt_feat[i])
 
         if self.has_input_output_proj:
             feat1 = self.input_proj(feat)
@@ -990,12 +1002,14 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
             feat1 = feat1 + hgt_feat[0].flatten(2).transpose(1, 2).contiguous()
         #Encoder
         conv0 = self.encoderlayer_0(feat1,mask=mask)
+        _assert_finite('conv0', conv0)
         if self.add_hgt and self.multi_add_pos == 'xcoder':
             conv0 = conv0 + hgt_feat[0].flatten(2).transpose(1, 2).contiguous()
         pool0 = self.dowsample_0(conv0)
         if self.add_hgt and self.multi_add_pos == 'encoder':
             pool0 = pool0 + hgt_feat[1].flatten(2).transpose(1, 2).contiguous()
         conv1 = self.encoderlayer_1(pool0,mask=mask)
+        _assert_finite('conv1', conv1)
         if self.add_hgt and self.multi_add_pos == 'xcoder':
             conv1 = conv1 + hgt_feat[1].flatten(2).transpose(1, 2).contiguous()
         pool1 = self.dowsample_1(conv1) #embed_dim*4
@@ -1005,53 +1019,79 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
             pool1 = pool1 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous() #was hgt_feat[3] as pixshuf was 5
         # Bottleneck
         conv2 = self.conv(pool1, mask=mask)
+        _assert_finite('conv2', conv2)
         if self.add_hgt and self.multi_add_pos == 'xcoder':
             conv2 = conv2 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous()
 
         #Decoder
         B, L, C = conv2.shape
-        out0 = self.scale0_outconv(conv2.transpose(1, 2).reshape(B, C, int(math.sqrt(L)), int(math.sqrt(L))))
+        H2 = W2 = self.reso // 4
+        if L != H2 * W2:
+            raise RuntimeError(
+                f'Token length mismatch at conv2: L={L}, expected H2*W2={H2}*{W2}={H2 * W2}'
+            )
+        out0 = self.scale0_outconv(conv2.transpose(1, 2).reshape(B, C, H2, W2))
+        _assert_finite('out0_pre_interp', out0)
         up0 = self.upsample_0(conv2) #embed_dim*2
+        _assert_finite('up0', up0)
         if self.add_hgt and self.multi_add_pos == 'decoder':
             up0 = up0 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous()
         deconv0 = torch.cat([up0,conv1],-1)
         deconv0 = self.decoderlayer_0(deconv0,mask=mask)
+        _assert_finite('deconv0', deconv0)
 
         B, L, C = deconv0.shape
-        out1 = self.scale1_outconv(deconv0.transpose(1, 2).reshape(B, C, int(math.sqrt(L)), int(math.sqrt(L))))
+        H1 = W1 = self.reso // 2
+        if L != H1 * W1:
+            raise RuntimeError(
+                f'Token length mismatch at deconv0: L={L}, expected H1*W1={H1}*{W1}={H1 * W1}'
+            )
+        out1 = self.scale1_outconv(deconv0.transpose(1, 2).reshape(B, C, H1, W1))
+        _assert_finite('out1_pre_interp', out1)
         up1 = self.upsample_1(deconv0) # embed_dim*1
+        _assert_finite('up1', up1)
         if self.add_hgt and self.multi_add_pos == 'decoder':
             up1 = up1 + hgt_feat[1].flatten(2).transpose(1, 2).contiguous()
         deconv1 = torch.cat([up1,conv0],-1)
         deconv1 = self.decoderlayer_1(deconv1,mask=mask)
+        _assert_finite('deconv1', deconv1)
 
         B, L, C = deconv1.shape
-        out2 = self.scale2_outconv(deconv1.transpose(1, 2).reshape(B, C, int(math.sqrt(L)), int(math.sqrt(L))))
+        H0 = W0 = self.reso
+        if L != H0 * W0:
+            raise RuntimeError(
+                f'Token length mismatch at deconv1: L={L}, expected H0*W0={H0}*{W0}={H0 * W0}'
+            )
+        out2 = self.scale2_outconv(deconv1.transpose(1, 2).reshape(B, C, H0, W0))
+        _assert_finite('out2_pre_interp', out2)
 
         if self.has_input_output_proj:
             deconv1 = self.output_proj(deconv1)
         else:
-            B, L, C = deconv1.shape
-            H = int(math.sqrt(L))
-            W = int(math.sqrt(L))
-            deconv1 = deconv1.transpose(1, 2).view(B, C, H, W)
+            deconv1 = deconv1.transpose(1, 2).view(B, C, H0, W0)
 
-        
         out = self.conv_after_body(deconv1) + feat
+        _assert_finite('conv_after_body', out)
         out = self.conv_before_upsample(out)
         out = self.sa_upsample_1(out)
+        _assert_finite('sa_upsample_1', out)
         #out3 = self.scale3_outconv(out)
         if self.add_hgt and self.multi_add_pos == 'decoder':
             out = out + hgt_feat[0]
         #out = self.sa_upsample_2(out)
-        
+
         #out = self.upsample(out)
         out4 = self.scale4_outconv(out)
-        
+
         out0 = F.interpolate(out0, out4.shape[2:], mode='bilinear', align_corners=False)
+        _assert_finite('out0_post_interp', out0)
         out1 = F.interpolate(out1, out4.shape[2:], mode='bilinear', align_corners=False)
+        _assert_finite('out1_post_interp', out1)
         out2 = F.interpolate(out2, out4.shape[2:], mode='bilinear', align_corners=False)
+        _assert_finite('out2_post_interp', out2)
         #out3 = F.interpolate(out3, out4.shape[2:], mode='bilinear', align_corners=False)
         out = self.conv_fuse(torch.cat([out0, out1, out2, out4], dim=1))
+        _assert_finite('conv_fuse', out)
         out = self.conv_last(out)
+        _assert_finite('conv_last', out)
         return self.act(out), self.act(out0), self.act(out1), self.act(out2) #, self.act(out3)
