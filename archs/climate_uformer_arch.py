@@ -774,13 +774,15 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
                  upsample=Upsample,
                  se_layer=False,
                  multi_add_pos='decoder', #encoder, decoder, xcoder
-                 has_input_output_proj=False
+                 has_input_output_proj=False,
+                 debug_finite_checks=False,
                  ):
         super(ClimateUformerMultiScaleHGTMultiScaleOut, self).__init__()
         self.upscale = upscale
         self.add_hgt = add_hgt
         self.multi_add_pos = multi_add_pos
         self.has_input_output_proj = has_input_output_proj
+        self.debug_finite_checks = debug_finite_checks
 
         self.num_enc_layers = len(depths)//2
         self.num_dec_layers = len(depths)//2
@@ -970,14 +972,14 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
     def forward(self, x_in, mask=None):
         x = x_in['lq']
         hgt = x_in['hgt']
-        # Debugging: Print statistics of the input tensor
-        if not hasattr(self, "_dbg_once"):
+        # One-shot debug print (only when finite checks are enabled)
+        if self.debug_finite_checks and not hasattr(self, "_dbg_once"):
             self._dbg_once = True
             print("x stats:", x.min().item(), x.max().item(), x.mean().item(), x.std().item())
         b, c, h, w = x.shape
 
         def _assert_finite(name, t):
-            if not torch.isfinite(t).all():
+            if self.debug_finite_checks and not torch.isfinite(t).all():
                 raise RuntimeError(
                     f'Non-finite values at stage "{name}", shape={tuple(t.shape)}'
                 )
