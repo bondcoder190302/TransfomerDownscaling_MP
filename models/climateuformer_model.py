@@ -97,6 +97,10 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
     def optimize_parameters(self, current_iter):
         logger = get_root_logger()
         self.optimizer_g.zero_grad()
+        # NaN/Inf guard on network parameters before forward pass
+        for n, p in self.net_g.named_parameters():
+            if p is not None and not torch.isfinite(p).all():
+                raise RuntimeError(f'Non-finite param before forward: {n}')
         with torch.cuda.amp.autocast(enabled=self.amp_training):
             self.output = self.net_g(self.lq)
         self.output = [v.float() for v in self.output]
@@ -149,7 +153,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer_g)
         # Clip gradients to prevent explosion and NaN loss
-        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=0.1) # Adjust max_norm as needed based on observed gradient magnitudes. earlier "1.0"
         self.scaler.step(self.optimizer_g)
         self.scaler.update()
 

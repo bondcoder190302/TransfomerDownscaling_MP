@@ -970,6 +970,10 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
     def forward(self, x_in, mask=None):
         x = x_in['lq']
         hgt = x_in['hgt']
+        # Debugging: Print statistics of the input tensor
+        if not hasattr(self, "_dbg_once"):
+            self._dbg_once = True
+            print("x stats:", x.min().item(), x.max().item(), x.mean().item(), x.std().item())
         b, c, h, w = x.shape
 
         def _assert_finite(name, t):

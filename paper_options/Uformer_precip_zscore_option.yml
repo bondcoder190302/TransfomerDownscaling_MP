@@ -82,7 +82,7 @@ path:
 train:
   optim_g:
     type: Adam
-    lr: !!float 5e-6
+    lr: !!float 1e-6
     betas: [0.9, 0.99]
 
   # 74 training samples, batch_size=4 → 19 iter/epoch; 120 epochs → 2280 total_iter
