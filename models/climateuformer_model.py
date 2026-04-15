@@ -150,12 +150,40 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             )
             return
 
+        # self.scaler.scale(l_total).backward()
+        # self.scaler.unscale_(self.optimizer_g)
+        # # Clip gradients to prevent explosion and NaN loss
+        # torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=0.1) # Adjust max_norm as needed based on observed gradient magnitudes. earlier "1.0"
+        # self.scaler.step(self.optimizer_g)
+        # self.scaler.update()
+        # NaN/Inf guard on gradients before optimizer step
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer_g)
-        # Clip gradients to prevent explosion and NaN loss
-        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=0.1) # Adjust max_norm as needed based on observed gradient magnitudes. earlier "1.0"
+
+        # 1) Check grads are finite before clipping/step
+        has_bad_grad = False
+        for n, p in self.net_g.named_parameters():
+            if p.grad is not None and not torch.isfinite(p.grad).all():
+                logger.warning(f'Non-finite grad in {n} at iter {current_iter}, skipping step')
+                has_bad_grad = True
+                break
+        if has_bad_grad:
+            self.optimizer_g.zero_grad(set_to_none=True)
+            return
+
+        # 2) Clip grads
+        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=0.1)
+
+        # 3) Optimizer step
         self.scaler.step(self.optimizer_g)
         self.scaler.update()
+
+        # 4) Check params stayed finite after step
+        for n, p in self.net_g.named_parameters():
+            if p is not None and not torch.isfinite(p).all():
+                logger.warning(f'Non-finite param after step in {n} at iter {current_iter}, skipping update')
+                self.optimizer_g.zero_grad(set_to_none=True)
+                return
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
