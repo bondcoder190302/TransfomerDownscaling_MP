@@ -73,6 +73,15 @@ class ClimateUformerModel(ClimateSRAddHGTModel):
 
 @MODEL_REGISTRY.register()
 class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
+    def __init__(self, opt):
+        super().__init__(opt)
+        self._freeze_layernorm_affine()
+
+    def _freeze_layernorm_affine(self):
+        for name, param in self.net_g.named_parameters():
+            if '.norm' in name and (name.endswith('.weight') or name.endswith('.bias')):
+                param.requires_grad = False
+
     def test(self):        # pad to multiplication of window_size
         window_size = self.opt['network_g']['window_size']
         scale = self.opt.get('scale')
@@ -96,7 +105,13 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
 
     def optimize_parameters(self, current_iter):
         logger = get_root_logger()
+
+        def _set_skip_log():
+            self.log_dict = OrderedDict()
+            self.log_dict['l_pix'] = torch.tensor(0.0, device=self.device)
+
         self.optimizer_g.zero_grad()
+        torch.autograd.set_detect_anomaly(True)
         # NaN/Inf guard on network parameters before forward pass
         for n, p in self.net_g.named_parameters():
             if p is not None and not torch.isfinite(p).all():
@@ -111,6 +126,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
                 logger.warning(
                     f'NaN/Inf in network output[{idx}] at iter {current_iter}, skipping update'
                 )
+                _set_skip_log()
                 return
 
         # Clamp outputs to z-score range; precipitation z-scores rarely exceed ±4σ
@@ -125,6 +141,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
                 logger.warning(
                     f'NaN/Inf in l_pix at iter {current_iter}, skipping update'
                 )
+                _set_skip_log()
                 return
             l_total += l_pix
             loss_dict['l_pix'] = l_pix
@@ -140,6 +157,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
                 logger.warning(
                     f'NaN/Inf in l_pix_multi at iter {current_iter}, skipping update'
                 )
+                _set_skip_log()
                 return
             l_total += l_pix_multi
             loss_dict['l_pix_multi'] = l_pix_multi
@@ -148,6 +166,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             logger.warning(
                 f'NaN/Inf in total loss at iter {current_iter}, skipping update'
             )
+            _set_skip_log()
             return
 
         # self.scaler.scale(l_total).backward()
@@ -169,6 +188,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
                 break
         if has_bad_grad:
             self.optimizer_g.zero_grad(set_to_none=True)
+            _set_skip_log()
             return
 
         # 2) Clip grads
@@ -183,6 +203,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             if p is not None and not torch.isfinite(p).all():
                 logger.warning(f'Non-finite param after step in {n} at iter {current_iter}, skipping update')
                 self.optimizer_g.zero_grad(set_to_none=True)
+                _set_skip_log()
                 return
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
