@@ -89,7 +89,7 @@ train:
     type: Adam
     lr: !!float  5e-7 #1e-6
     betas: [0.9, 0.99]
-    eps: !!float 1e-7  # slightly larger eps for numerical stability on CPU
+    eps: !!float 1e-7  # increased from PyTorch default 1e-8 for numerical stability on CPU
 
   # 74 training samples, batch_size=4 → 19 iter/epoch; 120 epochs → 2280 total_iter
   # Milestones at 50 %, 80 %, 90 %, 95 % of total_iter
