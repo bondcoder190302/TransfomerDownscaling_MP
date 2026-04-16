@@ -14,6 +14,7 @@ from einops.layers.torch import Rearrange
 import math
 import numpy as np
 import time
+import warnings
 from torch import einsum
 
 #########################################
@@ -427,7 +428,6 @@ class Mlp(nn.Module):
         # Clamp pre-activation values to a safe range to prevent NaN in GELU backward
         x = x.clamp(-10.0, 10.0)
         if self.debug_finite_checks and not torch.isfinite(x).all():
-            import warnings
             warnings.warn('Mlp: non-finite value after fc1+clamp', stacklevel=2)
         x = self.act(x)
         x = self.drop(x)
@@ -467,7 +467,6 @@ class LeFF(nn.Module):
         # Clamp pre-activation values to prevent NaN in GELU backward
         x = x.clamp(-10.0, 10.0)
         if self.debug_finite_checks and not torch.isfinite(x).all():
-            import warnings
             warnings.warn('LeFF: non-finite value after linear1+clamp', stacklevel=2)
         x = self.linear1_act(x)
 
@@ -479,7 +478,6 @@ class LeFF(nn.Module):
         # Clamp pre-activation values to prevent NaN in GELU backward
         x = x.clamp(-10.0, 10.0)
         if self.debug_finite_checks and not torch.isfinite(x).all():
-            import warnings
             warnings.warn('LeFF: non-finite value after dwconv+clamp', stacklevel=2)
         x = self.dwconv_act(x)
 

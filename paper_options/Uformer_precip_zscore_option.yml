@@ -18,6 +18,7 @@ freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug a
 
 # LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations then
 # automatically unfreeze them.  Set to 0 (default) to disable.  Typical value: 20–50.
+# Params are unfrozen at the first iteration where current_iter > ln_freeze_iters.
 ln_freeze_iters: 0
 
 # dataset and data loader settings

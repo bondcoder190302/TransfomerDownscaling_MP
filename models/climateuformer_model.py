@@ -97,7 +97,9 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
 
         # Scheduler coupling: track whether the optimizer actually stepped this iteration.
         # Used by update_learning_rate to avoid advancing LR on skipped updates.
-        self._optimizer_stepped = False
+        # Initialize to True so the very first update_learning_rate call (iter 0 / warmup)
+        # is not blocked before any optimize_parameters has run.
+        self._optimizer_stepped = True
 
         # Skip-step observability counters.
         self._total_iters = 0
@@ -150,7 +152,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         self._total_iters += 1
 
         # Auto-unfreeze LayerNorm affine params after warmup period.
-        if self._ln_frozen and self._ln_freeze_iters > 0 and current_iter >= self._ln_freeze_iters:
+        if self._ln_frozen and self._ln_freeze_iters > 0 and current_iter > self._ln_freeze_iters:
             self._unfreeze_layernorm_affine()
             self._ln_frozen = False
 
