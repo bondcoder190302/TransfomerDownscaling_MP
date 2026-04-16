@@ -152,7 +152,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         self._total_iters += 1
 
         # Auto-unfreeze LayerNorm affine params after warmup period.
-        if self._ln_frozen and self._ln_freeze_iters > 0 and current_iter > self._ln_freeze_iters:
+        if self._ln_frozen and current_iter > self._ln_freeze_iters:
             self._unfreeze_layernorm_affine()
             self._ln_frozen = False
 
@@ -163,7 +163,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         def _skip(reason):
             """Record a skipped step and emit periodic skip-rate summary."""
             self._skipped_iters += 1
-            skip_rate = self._skipped_iters / max(1, self._total_iters)
+            skip_rate = self._skipped_iters / self._total_iters
             logger.warning(
                 f'Skipping optimizer step at iter {current_iter} ({reason}). '
                 f'Cumulative skip rate: {self._skipped_iters}/{self._total_iters} '
