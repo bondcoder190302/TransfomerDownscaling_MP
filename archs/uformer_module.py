@@ -421,6 +421,8 @@ class Mlp(nn.Module):
 
     def forward(self, x):
         x = self.fc1(x)
+        # Clamp pre-activation values to a safe range to prevent NaN in GELU backward
+        x = x.clamp(-10.0, 10.0)
         x = self.act(x)
         x = self.drop(x)
         x = self.fc2(x)
@@ -439,10 +441,10 @@ class Mlp(nn.Module):
 class LeFF(nn.Module):
     def __init__(self, dim=32, hidden_dim=128, act_layer=nn.GELU,drop = 0.):
         super().__init__()
-        self.linear1 = nn.Sequential(nn.Linear(dim, hidden_dim),
-                                act_layer())
-        self.dwconv = nn.Sequential(nn.Conv2d(hidden_dim,hidden_dim,groups=hidden_dim,kernel_size=3,stride=1,padding=1),
-                        act_layer())
+        self.linear1_proj = nn.Linear(dim, hidden_dim)
+        self.linear1_act = act_layer()
+        self.dwconv_proj = nn.Conv2d(hidden_dim, hidden_dim, groups=hidden_dim, kernel_size=3, stride=1, padding=1)
+        self.dwconv_act = act_layer()
         self.linear2 = nn.Sequential(nn.Linear(hidden_dim, dim))
         self.dim = dim
         self.hidden_dim = hidden_dim
@@ -452,13 +454,19 @@ class LeFF(nn.Module):
         bs, hw, c = x.size()
         hh = int(math.sqrt(hw))
 
-        x = self.linear1(x)
+        x = self.linear1_proj(x)
+        # Clamp pre-activation values to prevent NaN in GELU backward
+        x = x.clamp(-10.0, 10.0)
+        x = self.linear1_act(x)
 
         # spatial restore
         x = rearrange(x, ' b (h w) (c) -> b c h w ', h = hh, w = hh).contiguous()
         # bs,hidden_dim,32x32
 
-        x = self.dwconv(x)
+        x = self.dwconv_proj(x)
+        # Clamp pre-activation values to prevent NaN in GELU backward
+        x = x.clamp(-10.0, 10.0)
+        x = self.dwconv_act(x)
 
         # flaten
         x = rearrange(x, ' b c h w -> b (h w) c', h = hh, w = hh).contiguous()

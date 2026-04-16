@@ -75,9 +75,15 @@ class ClimateUformerModel(ClimateSRAddHGTModel):
 class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
     def __init__(self, opt):
         super().__init__(opt)
-        self._freeze_layernorm_affine()
+        # Propagate top-level finite_debug flag into the network arch (default off)
+        if hasattr(self.net_g, 'debug_finite_checks'):
+            self.net_g.debug_finite_checks = bool(opt.get('finite_debug', False))
+        if opt.get('freeze_layernorm', False):
+            self._freeze_layernorm_affine()
 
     def _freeze_layernorm_affine(self):
+        logger = get_root_logger()
+        logger.info('Freezing LayerNorm affine parameters (freeze_layernorm=true)')
         for name, param in self.net_g.named_parameters():
             if '.norm' in name and (name.endswith('.weight') or name.endswith('.bias')):
                 param.requires_grad = False
@@ -111,12 +117,23 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             self.log_dict['l_pix'] = torch.tensor(0.0, device=self.device)
 
         self.optimizer_g.zero_grad()
-        torch.autograd.set_detect_anomaly(True)
-        # NaN/Inf guard on network parameters before forward pass
+
+        # Anomaly detection is expensive; only enable when explicitly requested
+        if self.opt.get('anomaly_detection', False):
+            torch.autograd.set_detect_anomaly(True)
+
+        # NaN/Inf guard on network parameters before forward pass (warn and skip, don't crash)
         for n, p in self.net_g.named_parameters():
             if p is not None and not torch.isfinite(p).all():
-                raise RuntimeError(f'Non-finite param before forward: {n}')
-        with torch.cuda.amp.autocast(enabled=self.amp_training):
+                logger.warning(
+                    f'Non-finite param before forward: {n} at iter {current_iter}, skipping update'
+                )
+                _set_skip_log()
+                return
+
+        # Use AMP only when fp16 is requested AND CUDA is available
+        use_amp = bool(self.opt.get('fp16', False)) and torch.cuda.is_available()
+        with torch.cuda.amp.autocast(enabled=use_amp):
             self.output = self.net_g(self.lq)
         self.output = [v.float() for v in self.output]
 
@@ -132,7 +149,7 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         # Clamp outputs to z-score range; precipitation z-scores rarely exceed ±4σ
         self.output = [v.clamp(-4.0, 4.0) for v in self.output]
 
-        l_total = 0
+        l_total = torch.tensor(0.0, device=self.device)
         loss_dict = OrderedDict()
         # pixel loss
         if self.cri_pix:
@@ -169,12 +186,6 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             _set_skip_log()
             return
 
-        # self.scaler.scale(l_total).backward()
-        # self.scaler.unscale_(self.optimizer_g)
-        # # Clip gradients to prevent explosion and NaN loss
-        # torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=0.1) # Adjust max_norm as needed based on observed gradient magnitudes. earlier "1.0"
-        # self.scaler.step(self.optimizer_g)
-        # self.scaler.update()
         # NaN/Inf guard on gradients before optimizer step
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer_g)
