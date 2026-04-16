@@ -14,6 +14,7 @@ from einops.layers.torch import Rearrange
 import math
 import numpy as np
 import time
+import warnings
 from torch import einsum
 
 #########################################
@@ -418,11 +419,16 @@ class Mlp(nn.Module):
         self.in_features = in_features
         self.hidden_features = hidden_features
         self.out_features = out_features
+        # Debug flag: emit a warning when a non-finite tensor is detected in forward.
+        # Off by default; set to True via model.debug_finite_checks for debugging.
+        self.debug_finite_checks = False
 
     def forward(self, x):
         x = self.fc1(x)
         # Clamp pre-activation values to a safe range to prevent NaN in GELU backward
         x = x.clamp(-10.0, 10.0)
+        if self.debug_finite_checks and not torch.isfinite(x).all():
+            warnings.warn('Mlp: non-finite value after fc1+clamp', stacklevel=2)
         x = self.act(x)
         x = self.drop(x)
         x = self.fc2(x)
@@ -448,6 +454,9 @@ class LeFF(nn.Module):
         self.linear2 = nn.Sequential(nn.Linear(hidden_dim, dim))
         self.dim = dim
         self.hidden_dim = hidden_dim
+        # Debug flag: emit a warning when a non-finite tensor is detected in forward.
+        # Off by default; set to True via model.debug_finite_checks for debugging.
+        self.debug_finite_checks = False
 
     def forward(self, x):
         # bs x hw x c
@@ -457,6 +466,8 @@ class LeFF(nn.Module):
         x = self.linear1_proj(x)
         # Clamp pre-activation values to prevent NaN in GELU backward
         x = x.clamp(-10.0, 10.0)
+        if self.debug_finite_checks and not torch.isfinite(x).all():
+            warnings.warn('LeFF: non-finite value after linear1+clamp', stacklevel=2)
         x = self.linear1_act(x)
 
         # spatial restore
@@ -466,6 +477,8 @@ class LeFF(nn.Module):
         x = self.dwconv_proj(x)
         # Clamp pre-activation values to prevent NaN in GELU backward
         x = x.clamp(-10.0, 10.0)
+        if self.debug_finite_checks and not torch.isfinite(x).all():
+            warnings.warn('LeFF: non-finite value after dwconv+clamp', stacklevel=2)
         x = self.dwconv_act(x)
 
         # flaten

@@ -13,8 +13,13 @@ fp16: false
 
 # Debug / stability flags (all off by default; set true only for debugging)
 anomaly_detection: false   # torch.autograd.set_detect_anomaly – expensive, off by default
-finite_debug: false        # enable _assert_finite checks in arch forward passes
-freeze_layernorm: false    # freeze LayerNorm affine params (debug aid, not for production)
+finite_debug: false        # enable _assert_finite / debug_finite_checks in arch/MLP forward passes
+freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug aid, not for production)
+
+# LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations then
+# automatically unfreeze them.  Set to 0 (default) to disable.  Typical value: 20–50.
+# Params are unfrozen at the first iteration where current_iter > ln_freeze_iters.
+ln_freeze_iters: 0
 
 # dataset and data loader settings
 datasets:
