@@ -26,6 +26,13 @@ freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug a
 # a longer warmup at higher learning rates.)
 ln_freeze_iters: 100
 
+# Gradient-fix strategy: if ≤ grad_fix_max_bad_params parameters have NaN/Inf
+# gradients at a given iteration, zero those individual gradients and proceed rather
+# than skipping the whole step.  This prevents isolated LN affine NaN events
+# (typically at encoderlayer_0.blocks.0.norm1.weight immediately post-unfreeze) from
+# discarding otherwise valid batch updates.  Set to 0 to revert to full-skip behaviour.
+grad_fix_max_bad_params: 3
+
 # dataset and data loader settings
 datasets:
   common:
@@ -121,7 +128,7 @@ train:
   # skip-rate recovery and metric movement with the combined stability fixes.
   # Restore to 4440 for full 120-epoch production training.
   total_iter: 400
-  warmup_iter: -1
+  warmup_iter: 50  # linear LR ramp from 0 → lr over first 50 iters (within LN freeze window)
 
   # losses
   pixel_opt:
