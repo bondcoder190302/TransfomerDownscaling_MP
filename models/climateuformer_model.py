@@ -195,8 +195,12 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
                 _skip(f'non-finite output[{idx}]')
                 return
 
-        # Clamp outputs to z-score range; precipitation z-scores rarely exceed ±4σ
-        self.output = [v.clamp(-4.0, 4.0) for v in self.output]
+        # Clamp outputs to a conservative z-score range to prevent loss explosion on
+        # outlier batches.  ±6σ covers >99.99 % of a Gaussian while preserving gradient
+        # flow for extreme precipitation events that can reach 5–6σ after log1p + z-score
+        # normalisation.  The previous ±4σ bound cut off heavy-rain extremes and blocked
+        # gradient signal for those samples.
+        self.output = [v.clamp(-6.0, 6.0) for v in self.output]
 
         l_total = torch.tensor(0.0, device=self.device)
         loss_dict = OrderedDict()
