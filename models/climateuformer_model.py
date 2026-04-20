@@ -113,9 +113,12 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         # is not blocked before any optimize_parameters has run.
         self._optimizer_stepped = True
 
-        # Skip-step observability counters.
+        # Skip-step and grad-zeroing observability counters.
         self._total_iters = 0
         self._skipped_iters = 0
+        # Counts iterations where some parameter gradients were NaN/Inf but were
+        # zeroed out individually rather than causing a full step skip.
+        self._zeroed_grad_iters = 0
 
     def _freeze_layernorm_affine(self):
         logger = get_root_logger()
@@ -246,18 +249,50 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer_g)
 
-        # 1) Check grads are finite before clipping/step
-        has_bad_grad = False
-        bad_grad_name = None
+        # 1) Handle non-finite gradients: zero out isolated NaN/Inf grads rather than
+        #    discarding the full batch.  LN affine params (especially norm1.weight in
+        #    encoderlayer_0) can produce NaN/Inf gradients in the first few iterations
+        #    after warmup-unfreeze because the rest of the network has adapted to frozen
+        #    LN statistics and the first post-unfreeze gradients are disproportionately
+        #    large.  Zeroing an individual parameter's gradient is equivalent to keeping
+        #    it frozen for one step; other parameters still receive valid updates.
+        #    If too many parameters have bad gradients (> grad_fix_max_bad_params), the
+        #    entire batch is treated as corrupt and the step is skipped as before.
+        _max_bad = int(self.opt.get('grad_fix_max_bad_params', 3))
+        _bad_grad_names = []
+        _bad_grad_params_list = []
         for n, p in self.net_g.named_parameters():
             if p.grad is not None and not torch.isfinite(p.grad).all():
-                has_bad_grad = True
-                bad_grad_name = n
-                break
-        if has_bad_grad:
+                _bad_grad_names.append(n)
+                _bad_grad_params_list.append(p)
+
+        if len(_bad_grad_names) > _max_bad:
+            # Too many bad parameters → full batch is corrupt; discard the step.
             self.optimizer_g.zero_grad(set_to_none=True)
-            _skip(f'non-finite grad in {bad_grad_name}')
+            _skip(
+                f'{len(_bad_grad_names)} non-finite grad params '
+                f'(>{_max_bad} threshold), e.g. {_bad_grad_names[0]}'
+            )
             return
+
+        # Zero only the bad grads (below threshold); all other grads remain valid.
+        for p in _bad_grad_params_list:
+            p.grad.zero_()
+
+        if _bad_grad_names:
+            # Isolated NaN/Inf (typically LN affine post-unfreeze) → zero them and
+            # proceed.  Record in the zero-rate counter (separate from skip-rate).
+            self._zeroed_grad_iters += 1
+            zero_rate = self._zeroed_grad_iters / self._total_iters
+            param_summary = ", ".join(_bad_grad_names[:2])
+            if len(_bad_grad_names) > 2:
+                param_summary += "..."
+            logger.warning(
+                f'Zeroed {len(_bad_grad_names)} non-finite grad(s) at iter {current_iter} '
+                f'({param_summary}). '
+                f'Cumulative zero rate: {self._zeroed_grad_iters}/{self._total_iters} '
+                f'({zero_rate:.1%})'
+            )
 
         # 2) Clip grads — max_norm=1.0 is aggressive enough to prevent run-away updates
         # while allowing meaningful weight updates on successful (non-skipped) steps.
