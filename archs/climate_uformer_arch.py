@@ -650,8 +650,11 @@ class ClimateUformerMultiScaleHGT(nn.Module):
         self.conv_last = nn.Conv2d(64, num_out_ch, 3, 1, 1)
         # activation function
         self.act = Activation(activation)
-        # commented out to Disable custom init for Uformer blocks
-        #self.apply(self._init_weights)
+        # Apply transformer-style weight initialisation (trunc_normal std=.02 for
+        # Linear layers; constant weight=1/bias=0 for LayerNorm). This replaces the
+        # default PyTorch Kaiming-uniform init for nn.Linear which produces weights
+        # ~5–8× larger, causing NaN/Inf gradients in early training.
+        self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -946,8 +949,11 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         self.conv_fuse = nn.Conv2d(64 * 4, 64, 3, 1, 1)
         # activation function
         self.act = Activation(activation)
-        # commented out to Disable custom init for Uformer blocks
-        #self.apply(self._init_weights)
+        # Apply transformer-style weight initialisation (trunc_normal std=.02 for
+        # Linear layers; constant weight=1/bias=0 for LayerNorm). This replaces the
+        # default PyTorch Kaiming-uniform init for nn.Linear which produces weights
+        # ~5–8× larger, causing NaN/Inf gradients in early training.
+        self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
