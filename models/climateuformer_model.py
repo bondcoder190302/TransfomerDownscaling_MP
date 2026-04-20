@@ -107,6 +107,32 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             if p is not None
         ]
 
+        # Optional extended freeze for encoderlayer_0 LN params only.
+        # encoderlayer_0 (the first encoder block) produces the most unstable gradients
+        # immediately after the global LN unfreeze because its features are closest to the
+        # raw input.  encoder0_ln_freeze_iters keeps these specific params frozen beyond
+        # ln_freeze_iters; set to 0 (default) to use the same duration as ln_freeze_iters.
+        self._encoder0_ln_freeze_iters = int(opt.get('encoder0_ln_freeze_iters', 0))
+        self._encoder0_ln_frozen = False
+        # Pre-cache encoderlayer_0 LN params for targeted freeze/unfreeze.
+        if hasattr(self.net_g, 'encoderlayer_0'):
+            self._encoder0_ln_affine_params = [
+                p
+                for m in self.net_g.encoderlayer_0.modules()
+                if isinstance(m, torch.nn.LayerNorm)
+                for p in (m.weight, m.bias)
+                if p is not None
+            ]
+        else:
+            self._encoder0_ln_affine_params = []
+        # If encoder0_ln_freeze_iters extends beyond ln_freeze_iters, ensure encoder0 is
+        # frozen from the start (the global freeze may or may not be active).
+        if (self._encoder0_ln_affine_params
+                and self._encoder0_ln_freeze_iters > self._ln_freeze_iters):
+            for p in self._encoder0_ln_affine_params:
+                p.requires_grad = False
+            self._encoder0_ln_frozen = True
+
         # Scheduler coupling: track whether the optimizer actually stepped this iteration.
         # Used by update_learning_rate to avoid advancing LR on skipped updates.
         # Initialize to True so the very first update_learning_rate call (iter 0 / warmup)
@@ -123,16 +149,46 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
     def _freeze_layernorm_affine(self):
         logger = get_root_logger()
         logger.info('Freezing LayerNorm affine parameters')
-        for name, param in self.net_g.named_parameters():
-            if '.norm' in name and (name.endswith('.weight') or name.endswith('.bias')):
-                param.requires_grad = False
+        for m in self.net_g.modules():
+            if isinstance(m, torch.nn.LayerNorm):
+                for param in (m.weight, m.bias):
+                    if param is not None:
+                        param.requires_grad = False
 
     def _unfreeze_layernorm_affine(self):
         logger = get_root_logger()
         logger.info('Unfreezing LayerNorm affine parameters after warmup')
-        for name, param in self.net_g.named_parameters():
-            if '.norm' in name and (name.endswith('.weight') or name.endswith('.bias')):
-                param.requires_grad = True
+        for m in self.net_g.modules():
+            if isinstance(m, torch.nn.LayerNorm):
+                for param in (m.weight, m.bias):
+                    if param is not None:
+                        param.requires_grad = True
+
+    def _unfreeze_non_encoder0_layernorm_affine(self):
+        """Unfreeze all LN affine params except those in encoderlayer_0 (extended freeze)."""
+        logger = get_root_logger()
+        enc0_ids = set(id(p) for p in self._encoder0_ln_affine_params)
+        n_unfreeze = 0
+        for m in self.net_g.modules():
+            if isinstance(m, torch.nn.LayerNorm):
+                for param in (m.weight, m.bias):
+                    if param is not None and id(param) not in enc0_ids:
+                        param.requires_grad = True
+                        n_unfreeze += 1
+        logger.info(
+            f'Unfreezing {n_unfreeze} non-encoder0 LayerNorm affine parameters; '
+            f'encoderlayer_0 LN stays frozen until iter {self._encoder0_ln_freeze_iters}'
+        )
+
+    def _unfreeze_encoder0_layernorm_affine(self):
+        """Unfreeze encoderlayer_0 LN affine params after extended freeze."""
+        logger = get_root_logger()
+        for p in self._encoder0_ln_affine_params:
+            p.requires_grad = True
+        logger.info(
+            f'Unfreezing {len(self._encoder0_ln_affine_params)} encoderlayer_0 '
+            f'LayerNorm affine parameters (extended freeze ended)'
+        )
 
     def update_learning_rate(self, current_iter, warmup_iter=-1):
         """Override to couple scheduler stepping to successful optimizer updates only."""
