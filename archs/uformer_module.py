@@ -353,6 +353,9 @@ class WindowAttention(nn.Module):
         q, k, v = self.qkv(x,attn_kv)
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
+        # Clamp raw attention logits to prevent extreme values that destabilise softmax
+        # backward and produce NaN gradients in upstream LayerNorm affine parameters.
+        attn = attn.clamp(-20.0, 20.0)
 
         relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
             self.win_size[0] * self.win_size[1], self.win_size[0] * self.win_size[1], -1)  # Wh*Ww,Wh*Ww,nH

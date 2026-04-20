@@ -243,8 +243,10 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             _skip(f'non-finite grad in {bad_grad_name}')
             return
 
-        # 2) Clip grads
-        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=0.1)
+        # 2) Clip grads — max_norm=1.0 is aggressive enough to prevent run-away updates
+        # while allowing meaningful weight updates on successful (non-skipped) steps.
+        # max_norm=0.1 was too restrictive and caused the validation metrics to remain flat.
+        torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=1.0)
 
         # 3) Optimizer step
         self.scaler.step(self.optimizer_g)
