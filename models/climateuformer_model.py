@@ -95,6 +95,18 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             self._freeze_layernorm_affine()
             self._ln_frozen = True
 
+        # Pre-cache LayerNorm affine parameters (weight + bias from every nn.LayerNorm
+        # module in the network).  Used by the per-LN gradient clip in optimize_parameters
+        # so we avoid re-iterating all named_parameters() on every training step and
+        # avoid relying on name-string matching.
+        self._ln_affine_params = [
+            p
+            for m in self.net_g.modules()
+            if isinstance(m, torch.nn.LayerNorm)
+            for p in (m.weight, m.bias)
+            if p is not None
+        ]
+
         # Scheduler coupling: track whether the optimizer actually stepped this iteration.
         # Used by update_learning_rate to avoid advancing LR on skipped updates.
         # Initialize to True so the very first update_learning_rate call (iter 0 / warmup)
@@ -251,6 +263,21 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         # while allowing meaningful weight updates on successful (non-skipped) steps.
         # max_norm=0.1 was too restrictive and caused the validation metrics to remain flat.
         torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), max_norm=1.0)
+
+        # 2b) Tighter per-group clip for LayerNorm affine params.
+        # After the LN warmup-freeze unfreeze, norm1/norm2 weight gradients can spike
+        # (the main network weights have adapted to the frozen LN statistics, so the
+        # first few post-unfreeze gradients for LN params are disproportionately large).
+        # A secondary cap of max_norm=0.1 on all LN affine params combined keeps those
+        # updates small and prevents the non-finite grad recurrences seen at
+        # encoderlayer_0.blocks.0.norm1.weight.  This is a no-op during the warmup
+        # freeze period because requires_grad=False → p.grad is None.
+        _ln_grad_params = [
+            p for p in self._ln_affine_params
+            if p.grad is not None and p.requires_grad
+        ]
+        if _ln_grad_params:
+            torch.nn.utils.clip_grad_norm_(_ln_grad_params, max_norm=0.1)
 
         # 3) Optimizer step
         self.scaler.step(self.optimizer_g)

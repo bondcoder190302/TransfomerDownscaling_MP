@@ -17,11 +17,14 @@ finite_debug: false        # enable _assert_finite / debug_finite_checks in arch
 freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug aid, not for production)
 
 # LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations then
-# automatically unfreeze them.  Set to 0 (default) to disable.  Typical value: 20–50.
-# Params are unfrozen at the first iteration where current_iter > ln_freeze_iters.
-# With _init_weights now enabled (trunc_normal std=.02), activations are stable from
-# the start and this guard is rarely triggered.  Kept as a lightweight safety net.
-ln_freeze_iters: 30
+# automatically unfreeze them.  Set to 0 (default) to disable.
+# At LR=2e-4, ~100 iters gives the main network weights enough time to stabilise before
+# LN affine params start adapting.  A per-LN gradient clamp (max_norm=0.1 in
+# optimize_parameters) provides an additional safety net after the unfreeze.
+# (30 iters was too short: instability at encoderlayer_0.blocks.0.norm1.weight was
+# observed immediately after unfreeze, suggesting the skip-rate target of <5% requires
+# a longer warmup at higher learning rates.)
+ln_freeze_iters: 100
 
 # dataset and data loader settings
 datasets:
