@@ -98,25 +98,25 @@ path:
 train:
   optim_g:
     type: Adam
-    lr: !!float  5e-7 #1e-6
+    lr: !!float 2e-4  # matches original Uformer paper; stable with _init_weights + clamp guards
     # betas: beta2=0.95 (vs default 0.999) gives a ~20-step effective window for the second
     # moment, making the adaptive rate respond more quickly to recent gradient magnitudes.
     # This helps escape the near-flat loss plateau seen with the standard beta2=0.999.
     betas: [0.9, 0.95]
-    eps: !!float 1e-6  # increased to 1e-6 from previous 1e-7 (PyTorch default is 1e-8) for numerical stability on CPU
+    eps: !!float 1e-6  # increased from PyTorch default 1e-8 for numerical stability on CPU
 
-  # 74 training samples, batch_size=4 → 19 iter/epoch; 120 epochs → 2280 total_iter
+  # 74 training samples, batch_size=2 → 37 iter/epoch; 120 epochs → 4440 total_iter
   # Milestones at 50 %, 80 %, 90 %, 95 % of total_iter.
   # For total_iter=400 debug run: 200, 320, 360, 380.
-  # For full run (total_iter=2280): restore to [1140, 1824, 2052, 2166].
+  # For full run (total_iter=4440): use [2220, 3552, 3996, 4218].
   scheduler:
     type: MultiStepLR
     milestones: [200, 320, 360, 380]
     gamma: 0.5
 
-  # Stability debug run: 400 iters (~21 epochs) is the minimum needed to observe
-  # skip-rate recovery and metric movement after the _init_weights fix.
-  # Restore to 2280 for full 120-epoch production training.
+  # Stability debug run: 400 iters (~11 epochs at batch_size=2) is enough to observe
+  # skip-rate recovery and metric movement with the combined stability fixes.
+  # Restore to 4440 for full 120-epoch production training.
   total_iter: 400
   warmup_iter: -1
 
