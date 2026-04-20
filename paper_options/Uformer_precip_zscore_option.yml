@@ -19,8 +19,8 @@ freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug a
 # LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations then
 # automatically unfreeze them.  Set to 0 (default) to disable.  Typical value: 20–50.
 # Params are unfrozen at the first iteration where current_iter > ln_freeze_iters.
-# Freezing prevents LN affine params from being corrupted during the first iterations
-# when activations are large and gradients are most unstable.
+# With _init_weights now enabled (trunc_normal std=.02), activations are stable from
+# the start and this guard is rarely triggered.  Kept as a lightweight safety net.
 ln_freeze_iters: 30
 
 # dataset and data loader settings
@@ -106,13 +106,18 @@ train:
     eps: !!float 1e-6  # increased to 1e-6 from previous 1e-7 (PyTorch default is 1e-8) for numerical stability on CPU
 
   # 74 training samples, batch_size=4 → 19 iter/epoch; 120 epochs → 2280 total_iter
-  # Milestones at 50 %, 80 %, 90 %, 95 % of total_iter
+  # Milestones at 50 %, 80 %, 90 %, 95 % of total_iter.
+  # For total_iter=400 debug run: 200, 320, 360, 380.
+  # For full run (total_iter=2280): restore to [1140, 1824, 2052, 2166].
   scheduler:
     type: MultiStepLR
-    milestones: [40, 64, 72, 76]
+    milestones: [200, 320, 360, 380]
     gamma: 0.5
 
-  total_iter: 80   # temporary debug run - restore to 2280 for full training
+  # Stability debug run: 400 iters (~21 epochs) is the minimum needed to observe
+  # skip-rate recovery and metric movement after the _init_weights fix.
+  # Restore to 2280 for full 120-epoch production training.
+  total_iter: 400
   warmup_iter: -1
 
   # losses
