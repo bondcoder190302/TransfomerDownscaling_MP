@@ -19,7 +19,9 @@ freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug a
 # LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations then
 # automatically unfreeze them.  Set to 0 (default) to disable.  Typical value: 20–50.
 # Params are unfrozen at the first iteration where current_iter > ln_freeze_iters.
-ln_freeze_iters: 0
+# Freezing prevents LN affine params from being corrupted during the first iterations
+# when activations are large and gradients are most unstable.
+ln_freeze_iters: 30
 
 # dataset and data loader settings
 datasets:
@@ -81,6 +83,10 @@ network_g:
   token_mlp: 'leff'
   activation: none
   multi_add_pos: 'xcoder'
+  # Set drop_path_rate=0.0 to disable stochastic depth.
+  # Stochastic depth amplifies residual-path gradients stochastically (factor 1/(1-p)),
+  # which compounds across depth-5 encoder blocks and drives norm1.weight gradients NaN.
+  drop_path_rate: 0.0
 
 # path
 path:
@@ -93,8 +99,11 @@ train:
   optim_g:
     type: Adam
     lr: !!float  5e-7 #1e-6
-    betas: [0.9, 0.99]
-    eps: !!float 1e-7  # increased from PyTorch default 1e-8 for numerical stability on CPU
+    # betas: beta2=0.95 (vs default 0.999) gives a ~20-step effective window for the second
+    # moment, making the adaptive rate respond more quickly to recent gradient magnitudes.
+    # This helps escape the near-flat loss plateau seen with the standard beta2=0.999.
+    betas: [0.9, 0.95]
+    eps: !!float 1e-6  # increased to 1e-6 from previous 1e-7 (PyTorch default is 1e-8) for numerical stability on CPU
 
   # 74 training samples, batch_size=4 → 19 iter/epoch; 120 epochs → 2280 total_iter
   # Milestones at 50 %, 80 %, 90 %, 95 % of total_iter
