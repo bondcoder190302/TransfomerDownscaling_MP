@@ -232,8 +232,14 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         """
         if self._optimizer_stepped:
             # Use effective (successful) iteration count for warmup so a high early
-            # skip-rate does not cause an abrupt LR jump.
-            effective_iter = self._successful_iters if warmup_iter > 0 else current_iter
+            # skip-rate does not cause an abrupt LR jump.  Only apply the guard while
+            # still within the warmup window; once warmup is over, use current_iter to
+            # allow the milestone-based scheduler to operate normally.
+            effective_iter = (
+                self._successful_iters
+                if warmup_iter > 0 and current_iter <= warmup_iter
+                else current_iter
+            )
             super().update_learning_rate(effective_iter, warmup_iter=warmup_iter)
         # Reset flag each time update_learning_rate is called (once per training iter).
         self._optimizer_stepped = False
