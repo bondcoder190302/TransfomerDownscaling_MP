@@ -26,52 +26,6 @@ freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug a
 # a longer warmup at higher learning rates.)
 ln_freeze_iters: 100
 
-# Per-encoder0 LN freeze: keep encoderlayer_0 LayerNorm affine params frozen for longer
-# than the rest of the network.  encoderlayer_0 is the shallowest (and therefore most
-# sensitive) encoder block; its LN affine params are the most common non-finite grad
-# hotspot after unfreeze.  Set to 0 to use the same schedule as ln_freeze_iters.
-# Effective only when > ln_freeze_iters; otherwise ln_freeze_iters governs both.
-freeze_encoder0_layernorm_warmup_iters: 150
-
-# Attention bias table freeze: freeze all relative_position_bias_table parameters for
-# the first N iterations.  These tables are the *earliest* gradient explosion hotspot
-# (seen at iter 1–15 with 73–150+ non-finite grad params in training logs).  Freezing
-# them during the critical first few iterations eliminates that hotspot entirely.
-# The tables are initialised with trunc_normal(std=0.02) which is safe but can receive
-# extreme incoming gradients before the rest of the network has settled.
-# Set to 0 to disable (default = enabled at 30 iters for conservative safety margin).
-freeze_attention_bias_warmup_iters: 30
-
-# Gradient-fix strategy: if ≤ grad_fix_max_bad_params parameters have NaN/Inf
-# gradients at a given iteration, zero those individual gradients and proceed rather
-# than skipping the whole step.  This prevents isolated LN affine NaN events
-# (typically at encoderlayer_0.blocks.0.norm1.weight immediately post-unfreeze) from
-# discarding otherwise valid batch updates.  Set to 0 to revert to full-skip behaviour.
-# Only used when nonfinite_policy: 'skip'.
-grad_fix_max_bad_params: 3
-
-# Non-finite gradient policy.
-#   'skip'               (default): use the fixed grad_fix_max_bad_params count threshold.
-#                         Skip the whole step if > threshold bad-grad params; otherwise
-#                         zero isolated bad grads and proceed.
-#   'sanitize_then_step': use a ratio-based threshold instead of a fixed count.
-#                         Zero all non-finite grads and step if fraction ≤
-#                         nonfinite_param_ratio_threshold; skip otherwise.
-#                         More robust at large model sizes where a fixed count is arbitrary.
-nonfinite_policy: skip
-
-# Fraction of parameters allowed to have non-finite gradients before the step is skipped
-# in 'sanitize_then_step' mode.  0.05 = up to 5% of parameters may have bad grads.
-# Ignored when nonfinite_policy is 'skip'.
-nonfinite_param_ratio_threshold: 0.05
-
-# Optional per-group gradient clip for relative_position_bias_table parameters.
-# These small tables (225 × nH floats) are the earliest gradient explosion hotspot
-# and benefit from a tighter clip than the global max_norm=1.0.
-# Set to null to disable (global clip applies only).
-# Recommended value when enabled: 0.5 (tighter than global but looser than LN clip).
-clip_grad_relative_position_bias: 0.5
-
 # dataset and data loader settings
 datasets:
   common:
@@ -167,7 +121,7 @@ train:
   # skip-rate recovery and metric movement with the combined stability fixes.
   # Restore to 4440 for full 120-epoch production training.
   total_iter: 400
-  warmup_iter: 50  # linear LR ramp from 0 → lr over first 50 iters (within LN freeze window)
+  warmup_iter: -1
 
   # losses
   pixel_opt:
