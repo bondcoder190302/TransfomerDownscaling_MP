@@ -87,6 +87,16 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         if opt.get('freeze_layernorm', False):
             self._freeze_layernorm_affine()
 
+        # Pre-cache encoder0 LayerNorm parameter names for granular freeze/unfreeze.
+        # Must be populated before any encoder0-specific freeze calls below.
+        self._enc0_ln_param_names = {
+            n
+            for n, p in self.net_g.named_parameters()
+            if n.startswith('encoderlayer_0.')
+            and ('.norm' in n)
+            and (n.endswith('.weight') or n.endswith('.bias'))
+        }
+
         # Optional LayerNorm affine warmup freeze: freeze for first N iters, then unfreeze.
         # Controlled by ln_freeze_iters (default 0 = disabled).
         self._ln_freeze_iters = int(opt.get('ln_freeze_iters', 0))
@@ -94,6 +104,28 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         if self._ln_freeze_iters > 0:
             self._freeze_layernorm_affine()
             self._ln_frozen = True
+
+        # Optional per-encoder0 LN freeze: keep encoderlayer_0 LayerNorm affine params
+        # frozen longer than the rest of the network.  Default 0 = same as ln_freeze_iters.
+        self._enc0_ln_freeze_iters = int(
+            opt.get('freeze_encoder0_layernorm_warmup_iters', 0)
+        )
+        self._enc0_ln_frozen = False
+        if self._enc0_ln_freeze_iters > 0:
+            self._freeze_encoder0_layernorm_affine()
+            self._enc0_ln_frozen = True
+
+        # Optional freeze of attention relative-position bias tables during early training.
+        # Relative position bias is initialised with trunc_normal(std=0.02) which is safe,
+        # but its gradient can blow up in the very first few iterations before the rest of
+        # the network has settled.  Freezing for N iters eliminates that hotspot.
+        self._attn_bias_freeze_iters = int(
+            opt.get('freeze_attention_bias_warmup_iters', 0)
+        )
+        self._attn_bias_frozen = False
+        if self._attn_bias_freeze_iters > 0:
+            self._freeze_attention_bias_tables()
+            self._attn_bias_frozen = True
 
         # Pre-cache LayerNorm affine parameters (weight + bias from every nn.LayerNorm
         # module in the network).  Used by the per-LN gradient clip in optimize_parameters
@@ -107,11 +139,39 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             if p is not None
         ]
 
+        # Pre-cache relative_position_bias_table parameters for targeted grad clipping
+        # and debug logging.  Collecting by attribute name avoids false matches.
+        self._rel_pos_bias_params = [
+            p
+            for n, p in self.net_g.named_parameters()
+            if 'relative_position_bias_table' in n
+        ]
+
+        # Non-finite gradient policy.
+        # 'skip'               – skip the whole step if >grad_fix_max_bad_params bad grads.
+        # 'sanitize_then_step' – zero all non-finite grads and proceed if the fraction of
+        #                        bad-grad params ≤ nonfinite_param_ratio_threshold; skip otherwise.
+        self._nonfinite_policy = opt.get('nonfinite_policy', 'skip')
+        self._nonfinite_ratio_threshold = float(
+            opt.get('nonfinite_param_ratio_threshold', 0.05)
+        )
+
+        # Optional gradient clip for relative_position_bias_table params.
+        # None = disabled (use global clip only); a float enables a tighter per-group clip.
+        _rpb_clip = opt.get('clip_grad_relative_position_bias', None)
+        self._rpb_grad_clip = float(_rpb_clip) if _rpb_clip is not None else None
+
         # Scheduler coupling: track whether the optimizer actually stepped this iteration.
         # Used by update_learning_rate to avoid advancing LR on skipped updates.
         # Initialize to True so the very first update_learning_rate call (iter 0 / warmup)
         # is not blocked before any optimize_parameters has run.
         self._optimizer_stepped = True
+
+        # Track successful (non-skipped) iterations separately so the warmup LR ramp
+        # is based on actual learning steps rather than total elapsed iters.  Without
+        # this guard, a high skip-rate during early training causes the LR to jump to
+        # base_lr at warmup_iter even when the optimiser has barely trained.
+        self._successful_iters = 0
 
         # Skip-step and grad-zeroing observability counters.
         self._total_iters = 0
@@ -134,10 +194,53 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             if '.norm' in name and (name.endswith('.weight') or name.endswith('.bias')):
                 param.requires_grad = True
 
+    def _freeze_encoder0_layernorm_affine(self):
+        logger = get_root_logger()
+        logger.info('Freezing encoderlayer_0 LayerNorm affine parameters')
+        for name, param in self.net_g.named_parameters():
+            if name in self._enc0_ln_param_names:
+                param.requires_grad = False
+
+    def _unfreeze_encoder0_layernorm_affine(self):
+        logger = get_root_logger()
+        logger.info('Unfreezing encoderlayer_0 LayerNorm affine parameters after warmup')
+        for name, param in self.net_g.named_parameters():
+            if name in self._enc0_ln_param_names:
+                param.requires_grad = True
+
+    def _freeze_attention_bias_tables(self):
+        logger = get_root_logger()
+        logger.info('Freezing relative_position_bias_table parameters')
+        for name, param in self.net_g.named_parameters():
+            if 'relative_position_bias_table' in name:
+                param.requires_grad = False
+
+    def _unfreeze_attention_bias_tables(self):
+        logger = get_root_logger()
+        logger.info('Unfreezing relative_position_bias_table parameters after warmup')
+        for name, param in self.net_g.named_parameters():
+            if 'relative_position_bias_table' in name:
+                param.requires_grad = True
+
     def update_learning_rate(self, current_iter, warmup_iter=-1):
-        """Override to couple scheduler stepping to successful optimizer updates only."""
+        """Override to couple scheduler stepping to successful optimizer updates only.
+
+        Warmup guard: the warmup LR ramp is based on the number of *successful*
+        (non-skipped) optimizer steps rather than on total elapsed iterations.
+        This prevents the LR from jumping aggressively to base_lr after a run of
+        skipped steps when current_iter reaches warmup_iter.
+        """
         if self._optimizer_stepped:
-            super().update_learning_rate(current_iter, warmup_iter=warmup_iter)
+            # Use effective (successful) iteration count for warmup so a high early
+            # skip-rate does not cause an abrupt LR jump.  Only apply the guard while
+            # still within the warmup window; once warmup is over, use current_iter to
+            # allow the milestone-based scheduler to operate normally.
+            effective_iter = (
+                self._successful_iters
+                if warmup_iter > 0 and current_iter <= warmup_iter
+                else current_iter
+            )
+            super().update_learning_rate(effective_iter, warmup_iter=warmup_iter)
         # Reset flag each time update_learning_rate is called (once per training iter).
         self._optimizer_stepped = False
 
@@ -171,9 +274,23 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             self._unfreeze_layernorm_affine()
             self._ln_frozen = False
 
+        # Auto-unfreeze encoderlayer_0 LN affine params (separate, longer freeze).
+        if self._enc0_ln_frozen and current_iter > self._enc0_ln_freeze_iters:
+            self._unfreeze_encoder0_layernorm_affine()
+            self._enc0_ln_frozen = False
+
+        # Auto-unfreeze relative_position_bias_table params after warmup.
+        if self._attn_bias_frozen and current_iter > self._attn_bias_freeze_iters:
+            self._unfreeze_attention_bias_tables()
+            self._attn_bias_frozen = False
+
         def _set_skip_log():
             self.log_dict = OrderedDict()
             self.log_dict['l_pix'] = torch.tensor(0.0, device=self.device)
+            self.log_dict['skipped'] = torch.tensor(1.0, device=self.device)
+            self.log_dict['skip_total'] = torch.tensor(
+                float(self._skipped_iters), device=self.device
+            )
 
         def _skip(reason):
             """Record a skipped step and emit periodic skip-rate summary."""
@@ -249,30 +366,74 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer_g)
 
-        # 1) Handle non-finite gradients: zero out isolated NaN/Inf grads rather than
-        #    discarding the full batch.  LN affine params (especially norm1.weight in
-        #    encoderlayer_0) can produce NaN/Inf gradients in the first few iterations
-        #    after warmup-unfreeze because the rest of the network has adapted to frozen
-        #    LN statistics and the first post-unfreeze gradients are disproportionately
-        #    large.  Zeroing an individual parameter's gradient is equivalent to keeping
-        #    it frozen for one step; other parameters still receive valid updates.
-        #    If too many parameters have bad gradients (> grad_fix_max_bad_params), the
-        #    entire batch is treated as corrupt and the step is skipped as before.
-        _max_bad = int(self.opt.get('grad_fix_max_bad_params', 3))
+        # 1) Handle non-finite gradients.
+        #
+        # Two policies are supported (controlled by nonfinite_policy in config):
+        #
+        # 'skip' (default):
+        #   If >grad_fix_max_bad_params parameters have non-finite gradients, skip the
+        #   whole step.  Otherwise zero the bad grads and proceed.
+        #
+        # 'sanitize_then_step':
+        #   Count the fraction of parameters with non-finite gradients.  If the fraction
+        #   is ≤ nonfinite_param_ratio_threshold (default 5%), zero the bad grads and
+        #   proceed.  If the fraction exceeds the threshold, skip the whole step.
+        #   This is more permissive than 'skip' at low bad-grad counts and more
+        #   principled about defining "too many bad grads" in terms of a ratio rather
+        #   than a fixed head-count.
+        #
+        # In either case, when relative_position_bias_table gradients are non-finite,
+        # a diagnostic log entry is emitted showing the table statistics.
+
         _bad_grad_names = []
         _bad_grad_params_list = []
+        _total_grad_params = 0
         for n, p in self.net_g.named_parameters():
-            if p.grad is not None and not torch.isfinite(p.grad).all():
-                _bad_grad_names.append(n)
-                _bad_grad_params_list.append(p)
+            if p.grad is not None:
+                _total_grad_params += 1
+                if not torch.isfinite(p.grad).all():
+                    _bad_grad_names.append(n)
+                    _bad_grad_params_list.append(p)
 
-        if len(_bad_grad_names) > _max_bad:
-            # Too many bad parameters → full batch is corrupt; discard the step.
-            self.optimizer_g.zero_grad(set_to_none=True)
-            _skip(
-                f'{len(_bad_grad_names)} non-finite grad params '
-                f'(>{_max_bad} threshold), e.g. {_bad_grad_names[0]}'
-            )
+        # Debug logging: log relative_position_bias_table stats when non-finite grads found.
+        if _bad_grad_names:
+            for n, p in self.net_g.named_parameters():
+                if 'relative_position_bias_table' in n and p.grad is not None:
+                    tbl = p.data
+                    g = p.grad
+                    logger.warning(
+                        f'[iter {current_iter}] relative_position_bias_table "{n}": '
+                        f'param max={tbl.max().item():.4f} min={tbl.min().item():.4f} '
+                        f'mean={tbl.mean().item():.4f}; '
+                        f'grad finite={torch.isfinite(g).all().item()} '
+                        f'max={g[torch.isfinite(g)].max().item() if torch.isfinite(g).any() else float("nan"):.4f}'
+                    )
+
+        # Decide whether to skip or sanitize based on the configured policy.
+        _should_skip = False
+        if _bad_grad_names:
+            if self._nonfinite_policy == 'sanitize_then_step':
+                bad_ratio = len(_bad_grad_names) / max(_total_grad_params, 1)
+                if bad_ratio > self._nonfinite_ratio_threshold:
+                    self.optimizer_g.zero_grad(set_to_none=True)
+                    _skip(
+                        f'{len(_bad_grad_names)}/{_total_grad_params} non-finite grad params '
+                        f'({bad_ratio:.1%} > ratio threshold {self._nonfinite_ratio_threshold:.1%}), '
+                        f'e.g. {_bad_grad_names[0]}'
+                    )
+                    _should_skip = True
+            else:
+                # Default 'skip' policy: use fixed count threshold.
+                _max_bad = int(self.opt.get('grad_fix_max_bad_params', 3))
+                if len(_bad_grad_names) > _max_bad:
+                    self.optimizer_g.zero_grad(set_to_none=True)
+                    _skip(
+                        f'{len(_bad_grad_names)} non-finite grad params '
+                        f'(>{_max_bad} threshold), e.g. {_bad_grad_names[0]}'
+                    )
+                    _should_skip = True
+
+        if _should_skip:
             return
 
         # Zero only the bad grads (below threshold); all other grads remain valid.
@@ -314,6 +475,22 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         if _ln_grad_params:
             torch.nn.utils.clip_grad_norm_(_ln_grad_params, max_norm=0.1)
 
+        # 2c) Optional targeted clip for relative_position_bias_table params.
+        # These are the first hotspot at training startup (iter 1–15 in logs showing
+        # 73–150+ non-finite grad params).  A tighter clip on just these small tables
+        # (typically 225 × nH floats) stops early gradient explosions without capping
+        # the rest of the network.  Disabled by default (clip_grad_relative_position_bias
+        # = null in config); enable by setting a positive float value.
+        if self._rpb_grad_clip is not None:
+            _rpb_grad_active = [
+                p for p in self._rel_pos_bias_params
+                if p.grad is not None and p.requires_grad
+            ]
+            if _rpb_grad_active:
+                torch.nn.utils.clip_grad_norm_(
+                    _rpb_grad_active, max_norm=self._rpb_grad_clip
+                )
+
         # 3) Optimizer step
         self.scaler.step(self.optimizer_g)
         self.scaler.update()
@@ -327,8 +504,13 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
 
         # Mark that the optimizer actually stepped so scheduler advances.
         self._optimizer_stepped = True
+        self._successful_iters += 1
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
+        self.log_dict['skipped'] = torch.tensor(0.0, device=self.device)
+        self.log_dict['skip_total'] = torch.tensor(
+            float(self._skipped_iters), device=self.device
+        )
 
         if self.ema_decay > 0:
             self.model_ema(decay=self.ema_decay)
