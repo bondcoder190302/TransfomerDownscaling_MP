@@ -72,12 +72,12 @@ datasets:
 # network structures
 network_g:
   type: ClimateUformerMultiScaleHGTMultiScaleOut
-  add_hgt: True
+  add_hgt: true
   upscale: 2
   num_in_ch: 1   # ERA5 precipitation (1 channel)
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
   img_size: 32   # LR input spatial size (gt_size / scale = 64 / 2)
-  window_size: 8
+  window_size: 4 #initially was 8, but 4 is more stable for the small 32x32 input size
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
   num_heads: [4, 8, 16, 16, 8]
@@ -120,7 +120,7 @@ train:
   # Stability debug run: 400 iters (~11 epochs at batch_size=2) is enough to observe
   # skip-rate recovery and metric movement with the combined stability fixes.
   # Restore to 4440 for full 120-epoch production training.
-  total_iter: 400
+  total_iter: 407
   warmup_iter: -1
 
   # losses
@@ -134,7 +134,7 @@ val:
   val_freq: 20
   save_img: false
   save_npy: false
-  save_npy_onlyoutput: true
+  save_npy_onlyoutput: false
   pbar: true
 
   metrics:
