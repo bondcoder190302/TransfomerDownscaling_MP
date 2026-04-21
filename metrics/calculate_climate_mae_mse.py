@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from basicsr.utils.registry import METRIC_REGISTRY
 
 @METRIC_REGISTRY.register()
-def calculate_climate_mae(img, img2, crop_border):
+def calculate_climate_mae(img, img2, crop_border, **kwargs):
     """Calculate SSIM (structural similarity).
 
     Ref:
@@ -46,7 +46,7 @@ def calculate_climate_mae(img, img2, crop_border):
     return maes
 
 @METRIC_REGISTRY.register()
-def calculate_climate_mse(img, img2, crop_border):
+def calculate_climate_mse(img, img2, crop_border, **kwargs):
     """Calculate SSIM (structural similarity).
 
     Ref:
@@ -88,7 +88,7 @@ def calculate_climate_mse(img, img2, crop_border):
     return mses
 
 @METRIC_REGISTRY.register()
-def calculate_climate_rmse(img, img2, crop_border):
+def calculate_climate_rmse(img, img2, crop_border, **kwargs):
     """Calculate SSIM (structural similarity).
 
     Ref:

@@ -87,7 +87,7 @@ def _ssim_compute(
     return ssim_idx.mean()
 
 @METRIC_REGISTRY.register()
-def calculate_climate_ssim(img, img2, crop_border):
+def calculate_climate_ssim(img, img2, crop_border, **kwargs):
     """Calculate SSIM (structural similarity).
 
     Ref:
@@ -130,7 +130,7 @@ def calculate_climate_ssim(img, img2, crop_border):
     return ssims
 
 @METRIC_REGISTRY.register()
-def calculate_climate_psnr(img, img2, crop_border):
+def calculate_climate_psnr(img, img2, crop_border, **kwargs):
     """Calculate SSIM (structural similarity).
 
     Ref:

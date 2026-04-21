@@ -141,14 +141,15 @@ val:
     psnr:
       type: calculate_climate_psnr
       crop_border: 0   # images are small (80×80), no border to crop
+      better: higher
     mse:
       type: calculate_climate_mse
       crop_border: 0
-      #better: lower
+      better: lower
     mae:
       type: calculate_climate_mae
       crop_border: 0
-      #better: lower
+      better: lower
 
 # logging settings
 logger:
