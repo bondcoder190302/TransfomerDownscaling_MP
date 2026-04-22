@@ -24,7 +24,7 @@ freeze_layernorm: false    # freeze LayerNorm affine params permanently (debug a
 # (30 iters was too short: instability at encoderlayer_0.blocks.0.norm1.weight was
 # observed immediately after unfreeze, suggesting the skip-rate target of <5% requires
 # a longer warmup at higher learning rates.)
-ln_freeze_iters: 100
+ln_freeze_iters: 30 # 100
 
 # dataset and data loader settings
 datasets:
@@ -77,7 +77,7 @@ network_g:
   num_in_ch: 1   # ERA5 precipitation (1 channel)
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
   img_size: 32   # LR input spatial size (gt_size / scale = 64 / 2)
-  window_size: 4 #initially was 8, but 4 is more stable for the small 32x32 input size
+  window_size: 8 #initially was 8, but 4 is more stable for the small 32x32 input size
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
   num_heads: [4, 8, 16, 16, 8]
@@ -101,7 +101,8 @@ path:
 train:
   optim_g:
     type: Adam
-    lr: !!float 1e-5 # matches original Uformer paper; stable with _init_weights + clamp guards
+    lr: !!float 2e-4 # was 1e-5
+    # matches original Uformer paper; stable with _init_weights + clamp guards
     # betas: beta2=0.95 (vs default 0.999) gives a ~20-step effective window for the second
     # moment, making the adaptive rate respond more quickly to recent gradient magnitudes.
     # This helps escape the near-flat loss plateau seen with the standard beta2=0.999.
@@ -121,7 +122,7 @@ train:
   # skip-rate recovery and metric movement with the combined stability fixes.
   # Restore to 4440 for full 120-epoch production training.
   total_iter: 407
-  warmup_iter: 3
+  warmup_iter: -1 #3
 
   # losses
   pixel_opt:
@@ -134,13 +135,13 @@ val:
   val_freq: 20
   save_img: false
   save_npy: false
-  save_npy_onlyoutput: false
+  save_npy_onlyoutput: true
   pbar: true
 
   metrics:
     psnr:
       type: calculate_climate_psnr
-      crop_border: 0   # images are small (80×80), no border to crop
+      crop_border: 0   # images are small (64x64), no border to crop
       better: higher
     mse:
       type: calculate_climate_mse
