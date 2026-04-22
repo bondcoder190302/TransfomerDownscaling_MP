@@ -1,6 +1,7 @@
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
+from functools import partial # for partial function application
 from basicsr.utils.registry import ARCH_REGISTRY
 from basicsr.archs.rcan_arch import ResidualGroup
 from basicsr.archs.arch_util import make_layer, default_init_weights
@@ -767,7 +768,7 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
                  drop_rate=0.,
                  attn_drop_rate=0.,
                  drop_path_rate=0.1,
-                 norm_layer=nn.LayerNorm,
+                 norm_layer=partial(nn.LayerNorm, eps=1e-4),
                  patch_norm=True,
                  use_checkpoint=False,
                  token_projection='linear',

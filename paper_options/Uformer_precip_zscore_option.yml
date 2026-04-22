@@ -101,7 +101,7 @@ path:
 train:
   optim_g:
     type: Adam
-    lr: !!float 2e-4 # was 1e-5
+    lr: !!float 1e-4 # was 1e-5
     # matches original Uformer paper; stable with _init_weights + clamp guards
     # betas: beta2=0.95 (vs default 0.999) gives a ~20-step effective window for the second
     # moment, making the adaptive rate respond more quickly to recent gradient magnitudes.
@@ -115,24 +115,25 @@ train:
   # For full run (total_iter=4440): use [2220, 3552, 3996, 4218].
   scheduler:
     type: MultiStepLR
-    milestones: [200, 320, 360, 380]
+    milestones: [2220, 3552, 3996, 4218]
     gamma: 0.5
 
   # Stability debug run: 400 iters (~11 epochs at batch_size=2) is enough to observe
   # skip-rate recovery and metric movement with the combined stability fixes.
   # Restore to 4440 for full 120-epoch production training.
-  total_iter: 407
-  warmup_iter: -1 #3
+  total_iter: 4440
+  warmup_iter: 400
 
   # losses
   pixel_opt:
     type: CharbonnierLoss
     loss_weight: 10
     reduction: mean
+    eps: !!float 1e-3  # Perceptual loss with a fixed VGG-based feature extractor (no training signal to the extractor).
 
 # validation settings
 val:
-  val_freq: 20
+  val_freq: 200
   save_img: false
   save_npy: false
   save_npy_onlyoutput: true
@@ -155,7 +156,7 @@ val:
 # logging settings
 logger:
   print_freq: 5
-  save_checkpoint_freq: 20
+  save_checkpoint_freq: 400
   use_tb_logger: true
 
 # dist training settings
