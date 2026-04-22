@@ -101,7 +101,7 @@ path:
 train:
   optim_g:
     type: Adam
-    lr: !!float 2e-4  # matches original Uformer paper; stable with _init_weights + clamp guards
+    lr: !!float 1e-5 # matches original Uformer paper; stable with _init_weights + clamp guards
     # betas: beta2=0.95 (vs default 0.999) gives a ~20-step effective window for the second
     # moment, making the adaptive rate respond more quickly to recent gradient magnitudes.
     # This helps escape the near-flat loss plateau seen with the standard beta2=0.999.
@@ -121,7 +121,7 @@ train:
   # skip-rate recovery and metric movement with the combined stability fixes.
   # Restore to 4440 for full 120-epoch production training.
   total_iter: 407
-  warmup_iter: -1
+  warmup_iter: 3
 
   # losses
   pixel_opt:

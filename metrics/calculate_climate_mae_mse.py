@@ -129,4 +129,3 @@ def calculate_climate_rmse(img, img2, crop_border, **kwargs):
         mse = F.mse_loss(input, target)
         mses.append(mse)
     return mses
-

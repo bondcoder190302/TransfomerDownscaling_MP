@@ -369,13 +369,21 @@ class ClimateSRModel(SRModel):
                             #options = {'proj': 'Mercator'}
                             pcolor_map_one(X, Y, Var_plot, title_temp, Xlabel, Ylabel, pathName, options)
 
+            #if with_metrics:
+                # calculate metrics
+            #    for name, opt_ in self.opt['val']['metrics'].items():
+            #        for idx in range(len(self.common_stat['index_gt'])):
+            #            metric_res = calculate_metric(metric_data, opt_)
+            #            self.metric_results[name+'_'+self.common_stat['listofVar'][idx]] += metric_res[idx]
             if with_metrics:
                 # calculate metrics
                 for name, opt_ in self.opt['val']['metrics'].items():
+                    opt_calc = opt_.copy()            # Make a copy of the options
+                    opt_calc.pop('better', None)      # Hide 'better' from the math function
                     for idx in range(len(self.common_stat['index_gt'])):
-                        metric_res = calculate_metric(metric_data, opt_)
-                        self.metric_results[name+'_'+self.common_stat['listofVar'][idx]] += metric_res[idx]
-
+                        metric_res = calculate_metric(metric_data, opt_calc)
+                        self.metric_results[name + '_' + self.common_stat['listofVar'][idx]] += metric_res[idx]
+                        
             if rank == 0 and use_pbar:
                 for _ in range(world_size):
                     pbar.update(1)

@@ -212,8 +212,8 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         # flow for extreme precipitation events that can reach 5–6σ after log1p + z-score
         # normalisation.  The previous ±4σ bound cut off heavy-rain extremes and blocked
         # gradient signal for those samples.
-        self.output = [v.clamp(-6.0, 6.0) for v in self.output]
-
+        # self.output = [v.clamp(-6.0, 6.0) for v in self.output]
+        self.output = [v.clamp(-20.0, 20.0) for v in self.output]
         l_total = torch.tensor(0.0, device=self.device)
         loss_dict = OrderedDict()
         # pixel loss
