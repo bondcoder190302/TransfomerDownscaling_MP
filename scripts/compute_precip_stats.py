@@ -1,25 +1,3 @@
-"""Compute normalization statistics for ERA5 precipitation, CHIRPS precipitation,
-and the DEM elevation variable, then save them as .pkl files in the format expected
-by MergeDataset.init_stat().
-
-Stat file naming convention (matches the dataset code):
-  varName.replace("_cut","").replace("_fix","") + "_stat.pkl"
-
-  ERA5_precip_cut      → ERA5_precip_stat.pkl
-  CHIRPS_precip_cut_obs → CHIRPS_precip_obs_stat.pkl
-  HGT_fix_cut_obs      → HGT_obs_stat.pkl
-
-Usage (run from the repository root):
-    python scripts/compute_precip_stats.py
-
-Note on precipitation skewness:
-  Precipitation distributions are heavily right-skewed (many zeros, rare large
-  values). A log1p transform (log(1+x)) before fitting z-score statistics can
-  improve normalization. Set LOG1P_TRANSFORM = True below to enable it; the same
-  transform must then be applied to your data before loading (i.e. pre-process the
-  .npy files with log1p before saving them to disk).
-"""
-
 import glob
 import os
 import pickle
@@ -28,34 +6,25 @@ import torch
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-DATAROOT = "./DownScale_Paper"
-STAT_DIR = os.path.join(DATAROOT, "param_stat_12_36")
+NPY_DIR  = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
+STAT_DIR = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper\param_stat_12_36"
 
-# Set to True if your .npy files have already been log1p-transformed.
+# Data is already log1p-transformed on disk → no need to apply again here
 LOG1P_TRANSFORM = False
 
-# Map from variable name (as used in the YAML config) to the directory that
-# holds the .npy files for that variable.
-#VAR_DIRS = {
-#    "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut"),
-#    "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs"),
-    # For the static elevation layer there is only one file; point directly to it.
-#    "HGT_fix_cut_obs":       os.path.join(DATAROOT, "HGT_fix_cut_obs"),
-#}
-
 VAR_DIRS = {
-    "ERA5_precip_cut":       os.path.join(DATAROOT, "ERA5_precip_cut_log1p"),      # ← ADD _log1p
-    "CHIRPS_precip_cut_obs": os.path.join(DATAROOT, "CHIRPS_precip_cut_obs_log1p"), # ← ADD _log1p
-    "HGT_fix_cut_obs":       os.path.join(DATAROOT, "HGT_fix_cut_obs"),
+    "ERA5_precip_cut":       os.path.join(NPY_DIR, "ERA5_precip_cut_log1p"),
+    "CHIRPS_precip_cut_obs": os.path.join(NPY_DIR, "CHIRPS_precip_cut_obs_log1p"),
+    "HGT_fix_cut_obs":       os.path.join(NPY_DIR, "HGT_fix_cut_obs"),
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-def stat_filename(var_name: str) -> str:
-    """Return the .pkl filename that MergeDataset expects for *var_name*."""
-    base = var_name.replace("_cut", "").replace("_fix", "")
-    return base + "_stat.pkl"
+# ── Stat filename map ──────────────────────────────────────────────────────────
+STAT_FILENAMES = {
+    "ERA5_precip_cut":       "ERA5_precip_log1p_stat.pkl",
+    "CHIRPS_precip_cut_obs": "CHIRPS_precip_obs_log1p_stat.pkl",
+    "HGT_fix_cut_obs":       "HGT_obs_stat.pkl",
+}
 
 
 def compute_stats(npy_dir: str, log1p: bool = False) -> dict:
@@ -67,7 +36,7 @@ def compute_stats(npy_dir: str, log1p: bool = False) -> dict:
     print(f"  Found {len(files)} file(s) in {npy_dir}")
 
     arrays = [np.load(f).astype(np.float32) for f in files]
-    data = np.concatenate([a.ravel() for a in arrays])
+    data   = np.concatenate([a.ravel() for a in arrays])
 
     if log1p:
         data = np.log1p(data)
@@ -88,15 +57,20 @@ if __name__ == "__main__":
 
     for var_name, npy_dir in VAR_DIRS.items():
         print(f"\nProcessing '{var_name}':")
-        stats = compute_stats(npy_dir, log1p=LOG1P_TRANSFORM)
-        fname = stat_filename(var_name)
+        stats    = compute_stats(npy_dir, log1p=LOG1P_TRANSFORM)
+        fname    = STAT_FILENAMES[var_name]          # ← use dict instead of function
         out_path = os.path.join(STAT_DIR, fname)
+
         with open(out_path, "wb") as f:
             pickle.dump(stats, f)
-        print(f"  mean={stats['mean'].item():.4f}  "
-              f"std={stats['var'].item()**0.5:.4f}  "
-              f"min={stats['min'].item():.4f}  "
-              f"max={stats['max'].item():.4f}")
+
+        print(f"  mean = {stats['mean'].item():.4f}")
+        print(f"  std  = {stats['var'].item()**0.5:.4f}")
+        print(f"  min  = {stats['min'].item():.4f}")
+        print(f"  max  = {stats['max'].item():.4f}")
         print(f"  Saved → {out_path}")
 
-    print("\nAll statistics saved successfully.")
+    print("\n✓ All statistics saved successfully.")
+    print(f"\n  Output files:")
+    for var_name in VAR_DIRS:
+        print(f"  {STAT_DIR}\\{STAT_FILENAMES[var_name]}")
