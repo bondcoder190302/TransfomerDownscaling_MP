@@ -1,7 +1,7 @@
 # Configuration for single-variable precipitation downscaling.
-# Input : ERA5 Land daily precipitation at 0.1° (36x36 for region [76,21,79.2,24.2])
-# Target: CHIRPS daily precipitation at 0.05° (64x64)
-# Auxiliary: Copernicus GLO-90 DEM elevation (64x64, static)
+# Input : ERA5 Land daily precipitation at 0.1° (64x64 for region)
+# Target: CHIRPS daily precipitation at 0.05° (128x128)
+# Auxiliary: Copernicus GLO-90 DEM elevation (128x128, static)
 # Scale factor: 2× (0.1° → 0.05°)
 
 name: Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
@@ -57,8 +57,8 @@ datasets:
     batch_size_per_gpu: 2
     dataset_enlarge_ratio: 1
     randomcrop: false
-    # Full HR image size (64 px at 0.05°); LQ crop = gt_size / scale = 36
-    gt_size: 64
+    # Full HR image size (128 px at 0.05°); LQ size = gt_size / scale = 128 / 2 = 64
+    gt_size: 128
     prefetch_mode: ~
 
   val:
@@ -76,7 +76,7 @@ network_g:
   upscale: 2
   num_in_ch: 1   # ERA5 precipitation (1 channel)
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
-  img_size: 32   # LR input spatial size (gt_size / scale = 64 / 2)
+  img_size: 64   # LR input spatial size (gt_size / scale = 128 / 2)
   window_size: 8 #initially was 8, but 4 is more stable for the small 32x32 input size
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
@@ -141,7 +141,7 @@ val:
   metrics:
     psnr:
       type: calculate_climate_psnr
-      crop_border: 0   # images are small (64x64), no border to crop
+      crop_border: 0   # images are small (128x128), no border to crop
       better: higher
     mse:
       type: calculate_climate_mse
