@@ -141,7 +141,13 @@ val:
   metrics:
     psnr:
       type: calculate_climate_psnr
-      crop_border: 0   # images are small (64x64), no border to crop
+      data_range: 5.5280  # Exact max from your CHIRPS log1p stats
+      crop_border: 0
+      better: higher
+    ssim:
+      type: calculate_climate_ssim
+      data_range: 5.5280
+      crop_border: 0
       better: higher
     mse:
       type: calculate_climate_mse

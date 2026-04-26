@@ -118,16 +118,32 @@ def calculate_climate_ssim(img, img2, crop_border, **kwargs):
         img = img[..., crop_border:-crop_border, crop_border:-crop_border]
         img2 = img2[..., crop_border:-crop_border, crop_border:-crop_border]
 
+    global_data_range = kwargs.get('data_range', None)
     ssims = []
     channels = img.shape[1]
     for c in range(channels):
         input = img[:, [c]]
         target = img2[:, [c]]
-        data_range = target.max() - target.min()
-        ssim = _ssim_compute(input, target, data_range)
+        dr = global_data_range if global_data_range is not None else (target.max() - target.min())
+        
+        if dr < 1e-8:
+            ssims.append(torch.tensor(1.0, device=img.device)) # Perfect similarity for zero-mask
+            continue
+            
+        ssim = _ssim_compute(input, target, dr)
         ssims.append(ssim)
-
+        
     return ssims
+    # ssims = []
+    # channels = img.shape[1]
+    # for c in range(channels):
+    #     input = img[:, [c]]
+    #     target = img2[:, [c]]
+    #     data_range = target.max() - target.min()
+    #     ssim = _ssim_compute(input, target, data_range)
+    #     ssims.append(ssim)
+
+    # return ssims
 
 @METRIC_REGISTRY.register()
 def calculate_climate_psnr(img, img2, crop_border, **kwargs):
@@ -160,15 +176,38 @@ def calculate_climate_psnr(img, img2, crop_border, **kwargs):
     if crop_border != 0:
         img = img[..., crop_border:-crop_border, crop_border:-crop_border]
         img2 = img2[..., crop_border:-crop_border, crop_border:-crop_border]
+    # Get global range from YAML; fallback to dynamic only if missing
+    global_data_range = kwargs.get('data_range', None)
 
     psnrs = []
     channels = img.shape[1]
     for c in range(channels):
         input = img[:, [c]]
         target = img2[:, [c]]
-        data_range = target.max() - target.min()
+        
+        dr = global_data_range if global_data_range is not None else (target.max() - target.min())
+        
+        # Guard against dry days (range=0) to avoid -inf
+        if dr < 1e-8:
+            psnrs.append(torch.tensor(0.0, device=img.device))
+            continue
+
         mse = F.mse_loss(input, target)
-        psnr = 20 * torch.log10(data_range / mse.sqrt())
+        if mse < 1e-10:
+            psnr = torch.tensor(100.0, device=img.device) # Perfect match
+        else:
+            psnr = 20 * torch.log10(dr / mse.sqrt())
         psnrs.append(psnr)
 
     return psnrs
+    # psnrs = []
+    # channels = img.shape[1]
+    # for c in range(channels):
+    #     input = img[:, [c]]
+    #     target = img2[:, [c]]
+    #     data_range = target.max() - target.min()
+    #     mse = F.mse_loss(input, target)
+    #     psnr = 20 * torch.log10(data_range / mse.sqrt())
+    #     psnrs.append(psnr)
+
+    # return psnrs
