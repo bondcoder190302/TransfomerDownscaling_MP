@@ -985,6 +985,16 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
             print("x stats:", x.min().item(), x.max().item(), x.mean().item(), x.std().item())
         b, c, h, w = x.shape
 
+        # Validate input spatial size against model's configured img_size.
+        # A mismatch means the config `img_size` (or `gt_size`) does not match
+        # the actual dataset resolution – update them in the YAML to match.
+        if h != self.reso or w != self.reso:
+            raise ValueError(
+                f"Input LQ spatial size ({h}×{w}) does not match model img_size "
+                f"({self.reso}×{self.reso}). Set `img_size: {h}` (and "
+                f"`gt_size: {h * self.upscale}`) in the network_g / dataset config."
+            )
+
         def _assert_finite(name, t):
             if self.debug_finite_checks and not torch.isfinite(t).all():
                 raise RuntimeError(
@@ -1038,10 +1048,12 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
 
         #Decoder
         B, L, C = conv2.shape
-        H2 = W2 = self.reso // 4
-        if L != H2 * W2:
+        # Derive spatial dims from the actual token count (robust to any img_size).
+        H2 = W2 = int(L ** 0.5)
+        if H2 * W2 != L:
             raise RuntimeError(
-                f'Token length mismatch at conv2: L={L}, expected H2*W2={H2}*{W2}={H2 * W2}'
+                f'Token length at conv2 ({L}) is not a perfect square – '
+                f'input spatial size must be divisible by 4.'
             )
         out0 = self.scale0_outconv(conv2.transpose(1, 2).reshape(B, C, H2, W2))
         _assert_finite('out0_pre_interp', out0)
@@ -1054,10 +1066,10 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         _assert_finite('deconv0', deconv0)
 
         B, L, C = deconv0.shape
-        H1 = W1 = self.reso // 2
-        if L != H1 * W1:
+        H1 = W1 = int(L ** 0.5)
+        if H1 * W1 != L:
             raise RuntimeError(
-                f'Token length mismatch at deconv0: L={L}, expected H1*W1={H1}*{W1}={H1 * W1}'
+                f'Token length at deconv0 ({L}) is not a perfect square.'
             )
         out1 = self.scale1_outconv(deconv0.transpose(1, 2).reshape(B, C, H1, W1))
         _assert_finite('out1_pre_interp', out1)
@@ -1070,10 +1082,10 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         _assert_finite('deconv1', deconv1)
 
         B, L, C = deconv1.shape
-        H0 = W0 = self.reso
-        if L != H0 * W0:
+        H0 = W0 = int(L ** 0.5)
+        if H0 * W0 != L:
             raise RuntimeError(
-                f'Token length mismatch at deconv1: L={L}, expected H0*W0={H0}*{W0}={H0 * W0}'
+                f'Token length at deconv1 ({L}) is not a perfect square.'
             )
         out2 = self.scale2_outconv(deconv1.transpose(1, 2).reshape(B, C, H0, W0))
         _assert_finite('out2_pre_interp', out2)
