@@ -7,7 +7,7 @@
 name: Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder
 model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
-num_gpu: 0  # set num_gpu: 0 for cpu mode
+num_gpu: 2  # set num_gpu: 0 for cpu mode
 manual_seed: 0
 fp16: false
 
@@ -57,8 +57,8 @@ datasets:
     batch_size_per_gpu: 2
     dataset_enlarge_ratio: 1
     randomcrop: false
-    # Full HR image size (64 px at 0.05°); LQ crop = gt_size / scale = 36
-    gt_size: 64
+    # Full HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
+    gt_size: 128
     prefetch_mode: ~
 
   val:
@@ -76,8 +76,8 @@ network_g:
   upscale: 2
   num_in_ch: 1   # ERA5 precipitation (1 channel)
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
-  img_size: 32   # LR input spatial size (gt_size / scale = 64 / 2)
-  window_size: 8 #initially was 8, but 4 is more stable for the small 32x32 input size
+  img_size: 64   # LR input spatial size (gt_size / scale = 128 / 2)
+  window_size: 8 #initially was 8, but 4 is more stable for the small 64x64 input size
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
   num_heads: [4, 8, 16, 16, 8]
