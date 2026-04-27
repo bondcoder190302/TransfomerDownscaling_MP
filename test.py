@@ -17,6 +17,8 @@ from basicsr.models import build_model
 from basicsr.utils import get_root_logger, get_time_str, make_exp_dirs
 from basicsr.utils.options import dict2str, parse_options
 import data.merge_dataset
+import models.climateuformer_model
+import archs.climate_uformer_arch
 
 def test_pipeline(root_path):
     # parse options, set distributed setting, set random seed
