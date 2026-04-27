@@ -49,7 +49,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: ~
+  pretrain_network_g: ./experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~
 
