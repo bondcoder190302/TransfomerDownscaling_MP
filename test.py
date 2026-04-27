@@ -75,11 +75,11 @@ def test_pipeline(root_path):
         else:
             model.nondist_validation(dataloader, 0, None, save_img)
 
-        if with_metrics:
-            log_str = f'Validation {dataset_name}\n'
-            for metric, value in model.get_current_metrics().items():
-                log_str += f'\t # {metric}: {value:.4f}\n'
-            logger.info(log_str)
+        # if with_metrics:
+        #     log_str = f'Validation {dataset_name}\n'
+        #     for metric, value in model.get_current_metrics().items():
+        #         log_str += f'\t # {metric}: {value:.4f}\n'
+        #     logger.info(log_str)
 
 if __name__ == '__main__':
     root_path = osp.abspath(osp.join(__file__, osp.pardir))
