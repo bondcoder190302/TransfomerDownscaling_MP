@@ -19,6 +19,7 @@ from basicsr.utils.options import dict2str, parse_options
 import data.merge_dataset
 import models.climateuformer_model
 import archs.climate_uformer_arch
+import metrics.calculate_climate_psnr_ssim
 
 def test_pipeline(root_path):
     # parse options, set distributed setting, set random seed
