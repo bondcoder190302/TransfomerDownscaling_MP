@@ -30,12 +30,31 @@ def test_pipeline(root_path):
     logger.info(dict2str(opt))
 
     # build dataloaders
+    # test_loaders = []
+    # for _, dataset_opt in sorted(opt['datasets'].items()):
+    #     test_set = build_dataset(dataset_opt)
+    #     test_loader = build_dataloader(
+    #         test_set, dataset_opt, num_gpu=opt['num_gpu'], dist=opt['dist'], sampler=None, seed=opt['manual_seed'])
+    #     logger.info(f"Number of test images in {dataset_opt['name']}: {len(test_set)}")
+    #     test_loaders.append(test_loader)
+    # build dataloaders
     test_loaders = []
-    for _, dataset_opt in sorted(opt['datasets'].items()):
-        test_set = build_dataset(dataset_opt)
+    # Extract the common settings to inject into the test phase
+    common_opt = opt['datasets'].get('common', {})
+
+    for phase, dataset_opt in sorted(opt['datasets'].items()):
+        # Skip 'common' and 'train' blocks during testing
+        if phase in ['common', 'train']:
+            continue
+            
+        # Merge common settings with the specific val/test settings
+        merged_opt = common_opt.copy()
+        merged_opt.update(dataset_opt)
+        
+        test_set = build_dataset(merged_opt)
         test_loader = build_dataloader(
-            test_set, dataset_opt, num_gpu=opt['num_gpu'], dist=opt['dist'], sampler=None, seed=opt['manual_seed'])
-        logger.info(f"Number of test images in {dataset_opt['name']}: {len(test_set)}")
+            test_set, merged_opt, num_gpu=opt['num_gpu'], dist=opt['dist'], sampler=None, seed=opt['manual_seed'])
+        logger.info(f"Number of test images in {merged_opt['name']} ({phase}): {len(test_set)}")
         test_loaders.append(test_loader)
 
     # build model
