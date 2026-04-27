@@ -19,7 +19,8 @@ from basicsr.utils.options import dict2str, parse_options
 
 def test_pipeline(root_path):
     # parse options, set distributed setting, set random seed
-    opt = parse_options(root_path, is_train=False)
+    #opt = parse_options(root_path, is_train=False)
+    opt, _ = parse_options(root_path, is_train=False)
 
     # make experiments and log dirs
     make_exp_dirs(opt)
