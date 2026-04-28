@@ -10,6 +10,7 @@ import numpy as np
 import cartopy
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER # <--- Add this
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 from matplotlib import font_manager
