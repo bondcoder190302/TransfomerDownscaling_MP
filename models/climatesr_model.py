@@ -317,9 +317,11 @@ class ClimateSRModel(SRModel):
                         area, base_time, lead_time = file_name, file_name, '0'
 
                     if save_img or (not self.opt['val'].get('save_npy_onlyoutput', False)):
-                        lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix_cut_obs', f'{area}_LAT.npy'))[:swh,:swh]
-                        lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix_cut_obs', f'{area}_LON.npy'))[:swh,:swh]
-
+                        #lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix_cut_obs', f'{area}_LAT.npy'))[:swh,:swh]
+                        #lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix_cut_obs', f'{area}_LON.npy'))[:swh,:swh]
+                        # Point to a single static file instead of a date-specific one
+                        lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix.npy'))[:swh, :swh]
+                        lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix.npy'))[:swh, :swh]
                     if save_npy:
                         if self.opt['val'].get('save_npy_onlyoutput', False):
                             save_res = outputs
@@ -492,8 +494,11 @@ class ClimateSRModel(SRModel):
                             if len(save_res) == 1:
                                 save_res = save_res.squeeze(0)
                         else:
-                            lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix_cut_obs', f'{area}_LAT.npy'))[:swh, :swh]
-                            lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix_cut_obs', f'{area}_LON.npy'))[:swh, :swh]
+                            #lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix_cut_obs', f'{area}_LAT.npy'))[:swh, :swh]
+                            #lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix_cut_obs', f'{area}_LON.npy'))[:swh, :swh]
+                            # Point to a single static file instead of a date-specific one
+                            lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix.npy'))[:swh, :swh]
+                            lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix.npy'))[:swh, :swh]
                             save_res = np.concatenate([lat_out[np.newaxis], lon_out[np.newaxis], images_np, outputs_np, targets_np], axis=0)
                         save_res_path = os.path.join(self.opt['path']['visualization'].replace('visualization', 'npy'), file_name + '.npy')
                         os.makedirs(os.path.dirname(save_res_path), exist_ok=True)
