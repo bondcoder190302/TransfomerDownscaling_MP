@@ -7,10 +7,9 @@ Created on Thu Sep 14 16:18:56 2017
 
 import os
 import numpy as np
+import cartopy
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-#import cartopy.crs as ccrs
-#import cartopy
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 from matplotlib import font_manager
