@@ -503,6 +503,41 @@ class ClimateSRModel(SRModel):
                         save_res_path = os.path.join(self.opt['path']['visualization'].replace('visualization', 'npy'), file_name + '.npy')
                         os.makedirs(os.path.dirname(save_res_path), exist_ok=True)
                         np.save(save_res_path, save_res)
+                        # =====================================================================
+                        # INSERT THIS BLOCK RIGHT AFTER np.save(save_res_path, save_res)
+                        # =====================================================================
+                        if save_img:
+                            X = []
+                            Y = []
+                            title_temp = ['ERA5 Input (LR)', 'Uformer Prediction', 'CHIRPS Target (HR)']
+    
+                            # If lat_out isn't loaded yet, load the static geographic grid
+                            if 'lat_out' not in locals():
+                                lat_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LAT_fix.npy'))[:swh, :swh]
+                                lon_out = np.load(os.path.join(self.common_stat['dirName_data'], 'LON_fix.npy'))[:swh, :swh]
+    
+                            X.extend([lon_out, lon_out, lon_out])
+                            Y.extend([lat_out, lat_out, lat_out])
+    
+                            for idx in range(len(self.common_stat['index_gt'])):
+                                # Uses _np suffix to match nondist_validation variable names
+                                Var_plot = [images_np[idx], outputs_np[idx], targets_np[idx]]
+    
+                                # Ensure the visualization folder exists
+                                os.makedirs(self.opt['path']['visualization'], exist_ok=True)
+                                pathName = os.path.join(self.opt['path']['visualization'], file_name + '_' + self.common_stat['varName_gt'][idx] + '.png')
+    
+                                # Custom colorbar settings for Precipitation to prevent KeyErrors
+                                options = {
+                                    'proj': 'Mercator', 
+                                    'Colorbar': True, 
+                                    'Colorbar_Tick': np.arange(-2, 7, 1), 
+                                    'Colorbar_label': 'Precipitation (Log1p)'
+                                }
+                                
+                                # Call the function from pcolor_map_one.py
+                                pcolor_map_one(X, Y, Var_plot, title_temp, '', '', pathName, options)
+                        # =====================================================================
 
             if with_metrics:
                 # calculate metrics
