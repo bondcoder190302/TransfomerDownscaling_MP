@@ -18,7 +18,7 @@ from  PIL import Image, ImageFont, ImageDraw
 from cartopy.feature import NaturalEarthFeature, LAND, COASTLINE
 import cartopy.mpl.ticker as cticker
 from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
-import cartoee as cee
+# import cartoee as cee  <--- KEEP THIS COMMENTED OUT OR DELETE IT
 
 def pcolor_map_one(X, Y, Var_plot, title_temp, Xlabel, Ylabel, pathName, options):
         
@@ -199,7 +199,8 @@ def pcolor_map_one(X, Y, Var_plot, title_temp, Xlabel, Ylabel, pathName, options
                         visualization['max'] = int(options['Colorbar_Tick'][-1])
                                              
                     #cb = cee.addColorbar(axes[i], loc='right', cmap = plt.get_cmap('jet'), visParams = visualization)
-                    cb = cee.addColorbar(axes[i], cax = cax, cmap = plt.get_cmap('jet'), visParams = visualization)
+                    #cb = cee.addColorbar(axes[i], cax = cax, cmap = plt.get_cmap('jet'), visParams = visualization)
+                    cb = plt.colorbar(cs, cax=cax)
                         
             ''
         elif 'quiver' in options.keys():                
@@ -513,7 +514,8 @@ def pcolor_map_one_python(X, Y, Var_plot, title_temp, Xlabel, Ylabel, pathName, 
                         visualization['max'] = int(options['Colorbar_Tick'][-1])
                                              
                     #cb = cee.addColorbar(axes[i], loc='right', cmap = plt.get_cmap('jet'), visParams = visualization)
-                    cb = cee.addColorbar(axes[i], cax = cax, cmap = plt.get_cmap('jet'), visParams = visualization)
+                    #cb = cee.addColorbar(axes[i], cax = cax, cmap = plt.get_cmap('jet'), visParams = visualization)
+                    cb = plt.colorbar(cs, cax=cax)
                         
             ''
         elif 'quiver' in options.keys():                
