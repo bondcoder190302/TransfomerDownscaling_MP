@@ -466,58 +466,37 @@ def pcolor_map_one_python(X, Y, Var_plot, title_temp, Xlabel, Ylabel, pathName, 
             print('#{} shape 1 {}, shape 2 {}'.format(i, X[i].shape, Var_plot[i].shape))
             
             if 'Colorbar_Tick' in options.keys():
-                axes[i].pcolor( X[i], Y[i], Var_plot[i], cmap = 'jet', \
-                    vmin = int(options['Colorbar_Tick'][0]), vmax = int(options['Colorbar_Tick'][-1]), \
-                    transform = getattr(ccrs, options['proj'])())
+                # Fix: Use pcolormesh and assign to 'cs'
+                cs = axes[i].pcolormesh(X[i], Y[i], Var_plot[i], cmap='jet', 
+                                        vmin=int(options['Colorbar_Tick'][0]), 
+                                        vmax=int(options['Colorbar_Tick'][-1]), 
+                                        transform=getattr(ccrs, options['proj'])())
             else:
-                axes[i].pcolor(X[i], Y[i], Var_plot[i], cmap = 'jet', \
-                    transform = getattr(ccrs, options['proj'])())
-            
-            # draw coastlines, country boundaries 
-            axes[i].coastlines(resolution = '50m', color='black', linewidth = 1)
-            #axes[i].add_feature(cartopy.feature.COASTLINE)
-            axes[i].add_feature(cartopy.feature.BORDERS, edgecolor='black')
-            #axes[i].add_feature(cartopy.feature.OCEAN)            
+                # Fix: Use pcolormesh and assign to 'cs'
+                cs = axes[i].pcolormesh(X[i], Y[i], Var_plot[i], cmap='jet', 
+                                        transform=getattr(ccrs, options['proj'])())
 
-            '''
-            # data resolution
-            resol = '50m'
-            
-            # province boundaries
-            provinc_bodr = cartopy.feature.NaturalEarthFeature(category='cultural', 
-            name='admin_1_states_provinces_lines', scale=resol, facecolor='none', edgecolor='k')
-            
-            axes[i].add_feature(provinc_bodr, linestyle='--', linewidth=0.6, edgecolor="k", zorder=10)
-            '''
+            # Draw coastlines and country boundaries 
+            axes[i].coastlines(resolution='50m', color='black', linewidth=1)
+            axes[i].add_feature(cartopy.feature.BORDERS, edgecolor='black')
+
+            # Format the gridlines
             axes[i].xaxis.set_major_formatter(LONGITUDE_FORMATTER)
             axes[i].yaxis.set_major_formatter(LATITUDE_FORMATTER)
             
             # Define the xticks for longitude
-            axes[i].set_xticks(np.arange(np.ceil(X[i].min()), X[i].max(), 2).astype(int), crs=getattr(ccrs, options['proj'])() )
+            axes[i].set_xticks(np.arange(np.ceil(X[i].min()), X[i].max(), 2).astype(int), crs=getattr(ccrs, options['proj'])())
             
             # Define the yticks for latitude
-            axes[i].set_yticks(np.arange(np.ceil(Y[i].min()), Y[i].max(), 2).astype(int), crs=getattr(ccrs, options['proj'])() )
+            axes[i].set_yticks(np.arange(np.ceil(Y[i].min()), Y[i].max(), 2).astype(int), crs=getattr(ccrs, options['proj'])())
             
-            ''
             if ('Colorbar' in options.keys()):
                 if options['Colorbar'] == True:
-
+                    # Fix: Standard Matplotlib colorbar linked to 'cs'
                     cax = axes[i].figure.add_axes(options['position'][-1])
-                    
-                    visualization = {}
-                    
-                    if 'Colorbar_label' in options.keys():
-                        visualization['bands'] = options['Colorbar_label']
-                            
-                    if 'Colorbar_Tick' in options.keys():
-                        visualization['min'] = int(options['Colorbar_Tick'][0])
-                        visualization['max'] = int(options['Colorbar_Tick'][-1])
-                                             
-                    #cb = cee.addColorbar(axes[i], loc='right', cmap = plt.get_cmap('jet'), visParams = visualization)
-                    #cb = cee.addColorbar(axes[i], cax = cax, cmap = plt.get_cmap('jet'), visParams = visualization)
                     cb = plt.colorbar(cs, cax=cax)
-                        
-            ''
+                    if 'Colorbar_label' in options.keys():
+                        cb.set_label(options['Colorbar_label'])
         elif 'quiver' in options.keys():                
 
             caxes.append( plt.contourf(X[i], Y[i], Var_plot[i]['WS'], cmap = 'jet') )
