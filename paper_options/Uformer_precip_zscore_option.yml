@@ -133,9 +133,9 @@ train:
 # validation settings
 val:
   val_freq: 500
-  save_img: false
-  save_npy: false
-  save_npy_onlyoutput: true
+  save_img: true
+  save_npy: true
+  save_npy_onlyoutput: false
   pbar: true
 
   metrics:
