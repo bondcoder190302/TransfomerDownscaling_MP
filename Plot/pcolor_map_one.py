@@ -15,10 +15,10 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 from matplotlib import font_manager
 from  PIL import Image, ImageFont, ImageDraw
-#from cartopy.feature import NaturalEarthFeature, LAND, COASTLINE
-#import cartopy.mpl.ticker as cticker
-#from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
-#import cartoee as cee
+from cartopy.feature import NaturalEarthFeature, LAND, COASTLINE
+import cartopy.mpl.ticker as cticker
+from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
+import cartoee as cee
 
 def pcolor_map_one(X, Y, Var_plot, title_temp, Xlabel, Ylabel, pathName, options):
         
