@@ -88,8 +88,9 @@ class ClimateSSIMLoss(nn.Module):
 
         ssim_idx = ((2 * mu_pred_target + c1) * (2 * sigma_pred_target + c2)) / (
             (mu_pred_sq + mu_target_sq + c1) * (sigma_pred_sq + sigma_target_sq + c2))
-        if pad_h > 0 and pad_w > 0:
-            ssim_idx = ssim_idx[..., pad_h:-pad_h, pad_w:-pad_w]
+        h_slice = slice(pad_h, -pad_h if pad_h > 0 else None)
+        w_slice = slice(pad_w, -pad_w if pad_w > 0 else None)
+        ssim_idx = ssim_idx[..., h_slice, w_slice]
         ssim_values = ssim_idx.mean(dim=(-2, -1))
 
         if zero_range_mask is not None:
