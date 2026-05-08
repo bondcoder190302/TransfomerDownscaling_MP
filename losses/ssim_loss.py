@@ -60,8 +60,8 @@ class ClimateSSIMLoss(nn.Module):
         pad_h = (self.kernel_size[0] - 1) // 2
         pad_w = (self.kernel_size[1] - 1) // 2
 
-        pred = F.pad(pred, (pad_h, pad_h, pad_w, pad_w), mode='reflect')
-        target = F.pad(target, (pad_h, pad_h, pad_w, pad_w), mode='reflect')
+        pred = F.pad(pred, (pad_w, pad_w, pad_h, pad_h), mode='reflect')
+        target = F.pad(target, (pad_w, pad_w, pad_h, pad_h), mode='reflect')
 
         input_list = torch.cat((pred, target, pred * pred, target * target, pred * target))
         outputs = F.conv2d(input_list, kernel, groups=channel)
