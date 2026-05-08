@@ -34,7 +34,7 @@ datasets:
     dirName_stat: ./DownScale_Paper/param_stat_12_36/
     dirName_data: ./DownScale_Paper/
     # Inputs: ERA5 precipitation (log1p) + ERA5 10 m wind speed/u/v (raw, no log1p)
-    # Stats are loaded from:
+    # Stats are loaded from varName.replace('_cut','').replace('_fix','') + '_stat.pkl':
     #   ERA5_precip_log1p_stat.pkl
     #   ERA5_wind_speed_10m_stat.pkl
     #   ERA5_u_wind_10m_stat.pkl
