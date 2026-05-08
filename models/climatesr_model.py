@@ -12,7 +12,7 @@ from basicsr.models.sr_model import SRModel
 from basicsr.utils import get_root_logger
 from basicsr.utils.registry import MODEL_REGISTRY
 from basicsr.metrics import calculate_metric
-import losses  # noqa: F401  # Import triggers losses/__init__.py auto-registration of local files ending with _loss.py.
+import losses  # noqa: F401  # Needed so losses register before build_loss() is first called.
 from Plot.pcolor_map_one import pcolor_map_one_python as pcolor_map_one
 from basicsr.utils.dist_util import get_dist_info
 from torch import distributed as dist

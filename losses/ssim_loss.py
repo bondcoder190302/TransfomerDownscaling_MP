@@ -65,6 +65,7 @@ class ClimateSSIMLoss(nn.Module):
         pred = F.pad(pred, (pad_w, pad_w, pad_h, pad_h), mode='reflect')
         target = F.pad(target, (pad_w, pad_w, pad_h, pad_h), mode='reflect')
 
+        # Batch five related statistics into one grouped convolution for efficiency.
         input_list = torch.cat((pred, target, pred * pred, target * target, pred * target))
         outputs = F.conv2d(input_list, kernel, groups=channel)
         output_list = outputs.split(pred.shape[0])
@@ -90,6 +91,7 @@ class ClimateSSIMLoss(nn.Module):
 
         ssim_idx = ((2 * mu_pred_target + c1) * (2 * sigma_pred_target + c2)) / (
             (mu_pred_sq + mu_target_sq + c1) * (sigma_pred_sq + sigma_target_sq + c2))
+        # `or None` handles pad=0 so we slice to the full extent instead of slice(0, 0).
         h_slice = slice(pad_h, -pad_h or None)
         w_slice = slice(pad_w, -pad_w or None)
         ssim_idx = ssim_idx[..., h_slice, w_slice]
