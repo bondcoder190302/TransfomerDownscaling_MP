@@ -12,9 +12,9 @@ OUTPUT_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
 VARIABLE_MAP = [
     ('ERA5_PRECIP',         'ERA5_precip_cut'),
     ('CHIRPS_PRECIP',       'CHIRPS_precip_cut_obs'),
-    ('ERA5_U_WIND_10M',     'ERA5_u_wind_10m'),
-    ('ERA5_V_WIND_10M',     'ERA5_v_wind_10m'),
-    ('ERA5_WIND_SPEED_10M', 'ERA5_wind_speed_10m'),
+    ('ERA5_U_WIND_10M',     'ERA5_u_wind_10m_cut'),
+    ('ERA5_V_WIND_10M',     'ERA5_v_wind_10m_cut'),
+    ('ERA5_WIND_SPEED_10M', 'ERA5_wind_speed_10m_cut'),
 ]
 
 YEARS = [2015, 2016, 2017, 2018, 2019, 2020]
@@ -132,10 +132,10 @@ else:
 print(f"""
   Output structure:
   NPY_new_128/
-  ├── ERA5_precip_cut/          →  2192 × (64,  64)  float32
-  ├── CHIRPS_precip_cut_obs/    →  2192 × (128, 128) float32
-  ├── ERA5_u_wind_10m/          →  2192 × (64,  64)  float32
-  ├── ERA5_v_wind_10m/          →  2192 × (64,  64)  float32
-  ├── ERA5_wind_speed_10m/      →  2192 × (64,  64)  float32
-  └── HGT_fix_cut_obs/          →  (already present, untouched)
+  ├── ERA5_precip_cut/              →  2192 × (64,  64)  float32
+  ├── CHIRPS_precip_cut_obs/        →  2192 × (128, 128) float32
+  ├── ERA5_u_wind_10m_cut/          →  2192 × (64,  64)  float32
+  ├── ERA5_v_wind_10m_cut/          →  2192 × (64,  64)  float32
+  ├── ERA5_wind_speed_10m_cut/      →  2192 × (64,  64)  float32
+  └── HGT_fix_cut_obs/              →  (already present, untouched)
 """)
