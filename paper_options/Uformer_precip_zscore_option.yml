@@ -33,8 +33,13 @@ datasets:
     type: MergeDataset
     dirName_stat: ./DownScale_Paper/param_stat_12_36/
     dirName_data: ./DownScale_Paper/
-    # One ERA5 Land precipitation variable (1 channel)
-    listofVar: [ERA5_precip_cut_log1p]
+    # Inputs: ERA5 precipitation (log1p) + ERA5 10 m wind speed/u/v (raw, no log1p)
+    # Stats are loaded from varName.replace('_cut','').replace('_fix','') + '_stat.pkl':
+    #   ERA5_precip_log1p_stat.pkl
+    #   ERA5_wind_speed_10m_stat.pkl
+    #   ERA5_u_wind_10m_stat.pkl
+    #   ERA5_v_wind_10m_stat.pkl
+    listofVar: [ERA5_precip_cut_log1p, ERA5_wind_speed_10m_cut, ERA5_u_wind_10m_cut, ERA5_v_wind_10m_cut]
     # CHIRPS precipitation is the super-resolution target (1 channel)
     varName_gt: [CHIRPS_precip_cut_obs_log1p]
     # Maps model output channel 0 → listofVar[0] for bicubic baseline comparison
@@ -74,7 +79,7 @@ network_g:
   type: ClimateUformerMultiScaleHGTMultiScaleOut
   add_hgt: true
   upscale: 2
-  num_in_ch: 1   # ERA5 precipitation (1 channel)
+  num_in_ch: 4   # ERA5 precipitation + ERA5 10 m wind speed/u/v
   num_out_ch: 1  # CHIRPS precipitation (1 channel)
   img_size: 64   # LR input spatial size (gt_size / scale = 128 / 2)
   window_size: 8 #initially was 8, but 4 is more stable for the small 64x64 input size
@@ -109,17 +114,16 @@ train:
     betas: [0.9, 0.95]
     eps: !!float 1e-6  # increased from PyTorch default 1e-8 for numerical stability on CPU
 
-  # 366 training samples, batch_size=2 → 147 iter/epoch; 120 epochs → 17640 total_iter
-  # Milestones at 50 %, 80 %, 90 %, 95 % of total_iter.
-  # For full run (total_iter=17640): use [8820, 14208, 15876, 17640].
+  # 6-year split (2015–2020): 1754 training samples from 2192 total days (per split files).
+  # With batch_size=2: 877 iter/epoch.
   scheduler:
     type: MultiStepLR
     milestones: [8820, 14208, 15876, 17640]
     gamma: 0.5
 
-  # Stability debug run: 400 iters (~11 epochs at batch_size=2) is enough to observe
+  # Stability debug run: 400 iters is enough to observe
   # skip-rate recovery and metric movement with the combined stability fixes.
-  # Restore to 17640 for full 120-epoch production training.
+  # Increase total_iter for long full-dataset training when needed.
   total_iter: 17640
   warmup_iter: 400
 
