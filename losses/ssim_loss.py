@@ -47,6 +47,8 @@ class ClimateSSIMLoss(nn.Module):
 
         if reduction != 'mean':
             raise ValueError(f'Unsupported reduction mode: {reduction}. Supported mode: mean.')
+        if kernel_size[0] % 2 == 0 or kernel_size[1] % 2 == 0:
+            raise ValueError(f'kernel_size must be odd in both dimensions, but got {kernel_size}.')
 
     def forward(self, pred, target):
         if pred.shape != target.shape:
@@ -88,8 +90,8 @@ class ClimateSSIMLoss(nn.Module):
 
         ssim_idx = ((2 * mu_pred_target + c1) * (2 * sigma_pred_target + c2)) / (
             (mu_pred_sq + mu_target_sq + c1) * (sigma_pred_sq + sigma_target_sq + c2))
-        h_slice = slice(pad_h, -pad_h if pad_h > 0 else None)
-        w_slice = slice(pad_w, -pad_w if pad_w > 0 else None)
+        h_slice = slice(pad_h, -pad_h or None)
+        w_slice = slice(pad_w, -pad_w or None)
         ssim_idx = ssim_idx[..., h_slice, w_slice]
         ssim_values = ssim_idx.mean(dim=(-2, -1))
 
