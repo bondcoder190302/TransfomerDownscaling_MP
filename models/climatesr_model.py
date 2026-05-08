@@ -12,7 +12,7 @@ from basicsr.models.sr_model import SRModel
 from basicsr.utils import get_root_logger
 from basicsr.utils.registry import MODEL_REGISTRY
 from basicsr.metrics import calculate_metric
-from metrics.calculate_climate_psnr_ssim import calculate_climate_ssim
+import losses  # noqa: F401  # Needed to register loss modules before build_loss() is first called.
 from Plot.pcolor_map_one import pcolor_map_one_python as pcolor_map_one
 from basicsr.utils.dist_util import get_dist_info
 from torch import distributed as dist
@@ -84,6 +84,18 @@ class ClimateSRModel(SRModel):
             self.cri_perceptual = build_loss(train_opt['perceptual_opt']).to(self.device)
         else:
             self.cri_perceptual = None
+        ssim_opt = train_opt.get('ssim_opt')
+        if ssim_opt:
+            self.cri_ssim = build_loss(ssim_opt).to(self.device)
+        elif train_opt.get('ssim_loss', False):
+            # Backward-compatible path for old configs.
+            self.cri_ssim = build_loss({
+                'type': 'ClimateSSIMLoss',
+                'loss_weight': train_opt.get('ssim_weight', 1.0),
+                'data_range': train_opt.get('ssim_data_range', None)
+            }).to(self.device)
+        else:
+            self.cri_ssim = None
 
         if train_opt.get('psd_opt'):
             self.cri_psd = build_loss(train_opt['psd_opt']).to(self.device)
@@ -185,16 +197,9 @@ class ClimateSRModel(SRModel):
                 l_total += l_style
                 loss_dict['l_style'] = l_style
 
-        if train_opt.get('ssim_loss', False):
-            ssim_list = calculate_climate_ssim(
-                self.output,
-                self.gt,
-                crop_border=0,
-                data_range=train_opt.get('ssim_data_range', None)
-            )
-            ssim_val = torch.stack(ssim_list).mean()
-            l_ssim = 1.0 - ssim_val
-            l_total += train_opt.get('ssim_weight', 1.0) * l_ssim
+        if self.cri_ssim:
+            l_ssim = self.cri_ssim(self.output, self.gt)
+            l_total += l_ssim
             loss_dict['l_ssim'] = l_ssim
 
         if self.cri_psd:
