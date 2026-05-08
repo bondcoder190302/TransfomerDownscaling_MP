@@ -12,6 +12,7 @@ from basicsr.models.sr_model import SRModel
 from basicsr.utils import get_root_logger
 from basicsr.utils.registry import MODEL_REGISTRY
 from basicsr.metrics import calculate_metric
+from metrics.calculate_climate_psnr_ssim import calculate_climate_ssim
 from Plot.pcolor_map_one import pcolor_map_one_python as pcolor_map_one
 from basicsr.utils.dist_util import get_dist_info
 from torch import distributed as dist
@@ -156,6 +157,7 @@ class ClimateSRModel(SRModel):
 
     def optimize_parameters(self, current_iter):
         self.optimizer_g.zero_grad()
+        train_opt = self.opt['train']
         with torch.cuda.amp.autocast(enabled=self.amp_training):
             self.output = self.net_g(self.lq)
         self.output = self.output.float()
@@ -164,7 +166,7 @@ class ClimateSRModel(SRModel):
             logger = get_root_logger()
             logger.warning(f'NaN/Inf detected in model output at iter {current_iter}, skipping parameter update')
             return
-        # Clip to �4s in normalized space to prevent extreme values from destabilizing loss
+        # Clip to 1s in normalized space to prevent extreme values from destabilizing loss
         self.output = torch.clamp(self.output, -4.0, 4.0)
         l_total = 0
         loss_dict = OrderedDict()
@@ -182,6 +184,18 @@ class ClimateSRModel(SRModel):
             if l_style is not None:
                 l_total += l_style
                 loss_dict['l_style'] = l_style
+
+        if train_opt.get('ssim_loss', False):
+            ssim_list = calculate_climate_ssim(
+                self.output,
+                self.gt,
+                crop_border=0,
+                data_range=train_opt.get('ssim_data_range', None)
+            )
+            ssim_val = torch.stack(ssim_list).mean()
+            l_ssim = 1.0 - ssim_val
+            l_total += train_opt.get('ssim_weight', 1.0) * l_ssim
+            loss_dict['l_ssim'] = l_ssim
 
         if self.cri_psd:
             l_psd = self.cri_psd(self.output, self.gt)
@@ -265,7 +279,7 @@ class ClimateSRModel(SRModel):
 
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h ,w)
-            # Clip to �4s in normalized space before denormalization
+            # Clip to 1s in normalized space before denormalization
             output = torch.clamp(output, -4.0, 4.0)
             target = self.gt.reshape(-1, c, h ,w)
             if isinstance(self.lq, dict):
@@ -436,7 +450,7 @@ class ClimateSRModel(SRModel):
 
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h, w)
-            # Clip to �4s in normalized space before denormalization
+            # Clip to 1s in normalized space before denormalization
             output = torch.clamp(output, -4.0, 4.0)
             target = self.gt.reshape(-1, c, h, w)
             if isinstance(self.lq, dict):
