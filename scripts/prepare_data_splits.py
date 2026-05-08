@@ -1,10 +1,10 @@
 """Generate data split files required by MergeDataset.
 Creates the following files under DownScale_Paper/DownScale_Correction_split/:
-  data.txt           – one filename (YYYYMMDD.npy) per line, all 366 days
-  train_12_36.txt    – 0-based indices of the training days  (≈80% → 293 days)
-  val_12_36.txt      – 0-based indices of the validation days (≈10% →  37 days)
-  test_12_36.txt     – 0-based indices of the test days       (≈10% →  36 days)
-Dataset: Full Year 2020 (366 days, leap year).
+  data.txt           – one filename (YYYYMMDD.npy) per line, all 2192 days
+  train_12_36.txt    – 0-based indices of the training days  (≈80% → 1754 days)
+  val_12_36.txt      – 0-based indices of the validation days (≈10% →  219 days)
+  test_12_36.txt     – 0-based indices of the test days       (≈10% →  219 days)
+Dataset: 6 year data (2192 days, including leap years).
 Split: RANDOM with fixed seed for reproducibility.
 Usage (run from the repository root):
     python scripts/prepare_data_splits.py
@@ -17,15 +17,15 @@ import random
 # ── Configuration ─────────────────────────────────────────────────────────────
 SPLIT_DIR  = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper\DownScale_Correction_split"
 
-START_DATE = datetime.date(2020, 1, 1)
+START_DATE = datetime.date(2015, 1, 1)
 END_DATE   = datetime.date(2020, 12, 31)
 
 RANDOM_SEED = 42   # fix seed → same split every run
 
-# 80 / 10 / 10 split over 366 days
-TRAIN_SIZE = 293
-VAL_SIZE   = 37
-# TEST_SIZE  = 366 - 293 - 37 = 36
+# 80 / 10 / 10 split over 2192 days
+TRAIN_SIZE = 1754
+VAL_SIZE   = 219
+# TEST_SIZE  = 2192 - 1754 - 219 = 219
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def date_range(start: datetime.date, end: datetime.date):
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     indices   = list(range(n))
 
     print(f"Total days : {n}  ({START_DATE} – {END_DATE})")
-    assert n == 366, f"Expected 366 days for 2020, got {n}"
+    assert n == 2192, f"Expected 2192 days for 6-year period, got {n}"
 
     # ── Random shuffle ────────────────────────────────────────────────────────
     random.seed(RANDOM_SEED)

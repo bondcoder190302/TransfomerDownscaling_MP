@@ -20,14 +20,14 @@ def apply_log1p_transform(input_dir, output_dir):
 
         if (i + 1) % 20 == 0 or i == 0 or (i + 1) == len(files):
             print(f"  [{i+1:3d}/{len(files)}] {filename}  "
-                  f"orig_max={data.max():.4f}  →  log1p_max={data_log1p.max():.4f}")
+                  f"orig_max={data.max():.7f}  →  log1p_max={data_log1p.max():.7f}")
 
     print(f"✓ Completed: {len(files)} files saved to {output_dir}")
 
 
 # ── PATHS ──────────────────────────────────────────────────────────────────────
-BASE_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
-
+#BASE_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
+BASE_DIR = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper"
 ERA5_IN    = os.path.join(BASE_DIR, "ERA5_precip_cut")
 CHIRPS_IN  = os.path.join(BASE_DIR, "CHIRPS_precip_cut_obs")
 
