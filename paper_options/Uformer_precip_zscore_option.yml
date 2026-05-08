@@ -114,7 +114,7 @@ train:
     betas: [0.9, 0.95]
     eps: !!float 1e-6  # increased from PyTorch default 1e-8 for numerical stability on CPU
 
-  # 6-year split (2015–2020): 1754 training samples from 2192 total days.
+  # 6-year split (2015–2020): 1754 training samples from 2192 total days (per split files).
   # With batch_size=2: 877 iter/epoch.
   scheduler:
     type: MultiStepLR
