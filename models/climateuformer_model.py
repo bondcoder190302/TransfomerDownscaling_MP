@@ -237,6 +237,14 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
                 return
             l_total += l_pix_multi
             loss_dict['l_pix_multi'] = l_pix_multi
+        # SSIM loss
+        if self.cri_ssim:
+            l_ssim = self.cri_ssim(self.output[0], self.gt)
+            if not torch.isfinite(l_ssim):
+                _skip('non-finite l_ssim')
+                return
+            l_total += l_ssim
+            loss_dict['l_ssim'] = l_ssim
 
         if not torch.isfinite(l_total):
             _skip('non-finite total loss')

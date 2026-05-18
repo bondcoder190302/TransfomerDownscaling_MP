@@ -133,11 +133,11 @@ train:
     loss_weight: 10
     reduction: mean
     eps: !!float 1e-3  # Perceptual loss with a fixed VGG-based feature extractor (no training signal to the extractor).
-  ssim_opt: ~  # Optional; keep null to disable.
+  # ssim_opt: ~  # Optional; keep null to disable.
   # To enable differentiable SSIM loss, use:
   ssim_opt:
     type: ClimateSSIMLoss
-    loss_weight: 0.1
+    loss_weight: 5
     data_range: 5.5280
 
 # validation settings
