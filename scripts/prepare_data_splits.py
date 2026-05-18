@@ -18,13 +18,14 @@ import random
 SPLIT_DIR  = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper\DownScale_Correction_split"
 
 START_DATE = datetime.date(2015, 1, 1)
-END_DATE   = datetime.date(2020, 12, 31)
+END_DATE   = datetime.date(2016,12,31) #(2020, 12, 31)
 
 RANDOM_SEED = 42   # fix seed → same split every run
 
 # 80 / 10 / 10 split over 2192 days
-TRAIN_SIZE = 1754
-VAL_SIZE   = 219
+#temp 731 days for 2015 and 2016
+TRAIN_SIZE = int(0.8*731) #1754
+VAL_SIZE   = int(0.1*731) #219
 # TEST_SIZE  = 2192 - 1754 - 219 = 219
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     indices   = list(range(n))
 
     print(f"Total days : {n}  ({START_DATE} – {END_DATE})")
-    assert n == 2192, f"Expected 2192 days for 6-year period, got {n}"
+    assert n == 731, f"Expected 731 days for 2-year period, got {n}"
 
     # ── Random shuffle ────────────────────────────────────────────────────────
     random.seed(RANDOM_SEED)
