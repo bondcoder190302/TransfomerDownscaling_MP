@@ -118,13 +118,13 @@ train:
   # With batch_size=2: 877 iter/epoch.
   scheduler:
     type: MultiStepLR
-    milestones: [5840, 8760] #[26340, 39510, 46095, 50485]
+    milestones: [26340, 39510, 46095, 50485] #[5840, 8760]
     gamma: 0.5
 
   # Stability debug run: 400 iters is enough to observe
   # skip-rate recovery and metric movement with the combined stability fixes.
   # Increase total_iter for long full-dataset training when needed.
-  total_iter: 11680 #52680
+  total_iter: 52680 #11680
   warmup_iter: 500
 
   # losses
@@ -142,7 +142,7 @@ train:
 
 # validation settings
 val:
-  val_freq: 100
+  val_freq: 439 #100
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
