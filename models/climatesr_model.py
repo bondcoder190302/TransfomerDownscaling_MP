@@ -322,7 +322,7 @@ class ClimateSRModel(SRModel):
             # tentative for out of GPU memory
             save_npy = self.opt['val'].get('save_npy', False)
             if save_img or self.opt['val'].get('save_img_train', 0) or save_npy:
-                if save_img  or (save_npy and didx < 50) or (current_iter >= self.opt['val'].get('save_img_train', 0) and didx < 10):
+                if save_img  or (save_npy and didx < 220) or (current_iter >= self.opt['val'].get('save_img_train', 0) and didx < 10):
                     swh = self.opt['val'].get('save_img_wh', 1000)
                     images = image.squeeze(0).cpu().numpy()[..., :swh,:swh]
                     targets = target[[-1]].squeeze(0).cpu().numpy()[...,:swh,:swh]
@@ -495,7 +495,7 @@ class ClimateSRModel(SRModel):
             # tentative for out of GPU memory
             save_npy = self.opt['val'].get('save_npy', False)
             if save_img or self.opt['val'].get('save_img_train', 0) or save_npy:
-                if save_img or (save_npy and didx < 50) or (current_iter >= self.opt['val'].get('save_img_train', 0) and didx < 10):
+                if save_img or (save_npy and didx < 220) or (current_iter >= self.opt['val'].get('save_img_train', 0) and didx < 10):
                     swh = self.opt['val'].get('save_img_wh', 1000)
                     images_np = image.squeeze(0).cpu().numpy()[..., :swh, :swh]
                     targets_np = target[[-1]].squeeze(0).cpu().numpy()[..., :swh, :swh]
