@@ -72,7 +72,7 @@ datasets:
 
 #  test:
 #    seq_interval: 1
-#    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
+#    train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
 
 # network structures
 network_g:
@@ -96,9 +96,27 @@ network_g:
   # which compounds across depth-5 encoder blocks and drives norm1.weight gradients NaN.
   drop_path_rate: 0.0
 
-# path
+# ── PATH CONFIGURATIONS & RUNTIME MODES ───────────────────────────────────────
 path:
-  pretrain_network_g: ~ #./experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder/models/net_g_latest.pth
+  # ────────────────────────────────────────────────────────────────────────────
+  # MODE A: Fresh Training Start
+  #   - Set pretrain_network_g: ~
+  #   - Set resume_state: ~
+  #
+  # MODE B: Resuming an Interrupted Run (Stage 1 to Stage 2 Chaining)
+  #   - Set pretrain_network_g: ~
+  #   - Set resume_state: [path to your saved .state file, e.g., 52680.state]
+  #   - NOTE: This reloads the exact weights, optimizer states, epoch logs, and
+  #     learning rate counters. Use this to bypass Kaggle's 12-hour limit.
+  #
+  # MODE C: Testing / Inference Mode (Using a fully trained model)
+  #   - Set pretrain_network_g: [path to your best weights file, e.g., net_g_latest.pth]
+  #   - Set resume_state: ~
+  #   - NOTE: This loads ONLY the network's architectural weights to generate
+  #     predictions or run test metrics on validation data.
+  # ────────────────────────────────────────────────────────────────────────────
+  
+  pretrain_network_g: ~ 
   strict_load_g: true
   resume_state: ~
 
@@ -121,11 +139,21 @@ train:
     # Shift milestones outward so they trigger at true 50%, 75%, 85%, and 95% completion marks
     milestones: [52680, 79020, 92190, 100970]
     gamma: 0.5
-
-  # Double your target iteration parameter so that the compressed 
-  # epoch loop translates to a true 120-epoch training life.
-  total_iter: 105360  # (52,680 real steps needed * 2)
-  warmup_iter: 1000   # Scaled warmup
+  # ── FRAMEWORK & RUNTIME STRATEGY FOR 120-EPOCH LIFECYCLE ───────────────────
+  # Due to a bug in BasicSR's multi-GPU Distributed/DataParallel setup, the 
+  # internal epoch loop executes twice as fast (439 steps per epoch instead of 
+  # the calculated 877 steps). To achieve a true 120-epoch training life, the 
+  # total iteration ceiling must be doubled to 105,360.
+  # 
+  # Kaggle Enforcement: Because a full 105360 run takes ~22 hours and exceeds 
+  # Kaggle's strict 12-hour continuous runtime wall, the training is split into 
+  # two stages:
+  #   - STAGE 1 (Current): Set 'total_iter: 52680' to finish 60 epochs gracefully.
+  #   - STAGE 2 (Resume): Use 'resume_state', change 'total_iter: 105360' to 
+  #     complete the final 60 epochs.
+  # ───────────────────────────────────────────────────────────────────────────
+  total_iter: 52680     # Hard stop at the halfway mark to beat the 12-hour limit
+  warmup_iter: 1000     # Scaled learning rate warmup to stabilize transformer layers
 
   # losses
   pixel_opt:
