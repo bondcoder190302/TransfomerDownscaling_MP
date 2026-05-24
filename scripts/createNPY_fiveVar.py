@@ -11,6 +11,7 @@ OUTPUT_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
 # DEM is intentionally excluded — already present in output directory.
 VARIABLE_MAP = [
     ('ERA5_PRECIP',         'ERA5_precip_cut'),
+    ('MSWEP_PRECIP',        'MSWEP_precip_cut'),
     ('CHIRPS_PRECIP',       'CHIRPS_precip_cut_obs'),
     ('ERA5_U_WIND_10M',     'ERA5_u_wind_10m_cut'),
     ('ERA5_V_WIND_10M',     'ERA5_v_wind_10m_cut'),
@@ -133,6 +134,7 @@ print(f"""
   Output structure:
   NPY_new_128/
   ├── ERA5_precip_cut/              →  2192 × (64,  64)  float32
+  ├── MSWEP_precip_cut/             →  2192 × (64,  64)  float32
   ├── CHIRPS_precip_cut_obs/        →  2192 × (128, 128) float32
   ├── ERA5_u_wind_10m_cut/          →  2192 × (64,  64)  float32
   ├── ERA5_v_wind_10m_cut/          →  2192 × (64,  64)  float32

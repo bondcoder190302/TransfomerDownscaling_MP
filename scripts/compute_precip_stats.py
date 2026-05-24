@@ -7,8 +7,8 @@ import torch
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 # Your requested base and output directories
-NPY_DIR  = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper"
-STAT_DIR = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper\param_stat_12_36"
+NPY_DIR  = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
+STAT_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\pkl_files"
 
 # Data is already log1p-transformed on disk for precip → no need to apply again here
 LOG1P_TRANSFORM = False
@@ -16,6 +16,7 @@ LOG1P_TRANSFORM = False
 # Dictionary mapping variable keys to their folder paths
 VAR_DIRS = {
     "ERA5_precip_cut":       os.path.join(NPY_DIR, "ERA5_precip_cut_log1p"),
+    "MSWEP_precip_cut":      os.path.join(NPY_DIR, "MSWEP_precip_cut_log1p"),
     "CHIRPS_precip_cut_obs": os.path.join(NPY_DIR, "CHIRPS_precip_cut_obs_log1p"),
     "HGT_fix_cut_obs":       os.path.join(NPY_DIR, "HGT_fix_cut_obs"),
     "ERA5_u_wind":           os.path.join(NPY_DIR, "ERA5_u_wind_10m_cut"),
@@ -27,6 +28,7 @@ VAR_DIRS = {
 # Dictionary mapping keys to the specific .pkl filenames used in your YAML
 STAT_FILENAMES = {
     "ERA5_precip_cut":       "ERA5_precip_log1p_stat.pkl",
+    "MSWEP_precip_cut":      "MSWEP_precip_log1p_stat.pkl",
     "CHIRPS_precip_cut_obs": "CHIRPS_precip_obs_log1p_stat.pkl",
     "HGT_fix_cut_obs":       "HGT_obs_stat.pkl",
     "ERA5_u_wind":           "ERA5_u_wind_10m_stat.pkl",

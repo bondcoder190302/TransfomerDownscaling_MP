@@ -33,13 +33,14 @@ datasets:
     type: MergeDataset
     dirName_stat: ./DownScale_Paper/param_stat_12_36/
     dirName_data: ./DownScale_Paper/
-    # Inputs: ERA5 precipitation (log1p) + ERA5 10 m wind speed/u/v (raw, no log1p)
+    # Inputs: MSWEP precipitation (log1p) + ERA5 10 m wind speed/u/v (raw, no log1p)
     # Stats are loaded from varName.replace('_cut','').replace('_fix','') + '_stat.pkl':
-    #   ERA5_precip_log1p_stat.pkl
+    #   MSWEP_precip_log1p_stat.pkl
     #   ERA5_wind_speed_10m_stat.pkl
     #   ERA5_u_wind_10m_stat.pkl
     #   ERA5_v_wind_10m_stat.pkl
-    listofVar: [ERA5_precip_cut_log1p, ERA5_wind_speed_10m_cut, ERA5_u_wind_10m_cut, ERA5_v_wind_10m_cut]
+    # add ERA5_precip_cut_log1p to listofVar and varName_gt when want to use ERA5 land precip
+    listofVar: [MSWEP_precip_cut_log1p, ERA5_wind_speed_10m_cut, ERA5_u_wind_10m_cut, ERA5_v_wind_10m_cut]
     # CHIRPS precipitation is the super-resolution target (1 channel)
     varName_gt: [CHIRPS_precip_cut_obs_log1p]
     # Maps model output channel 0 → listofVar[0] for bicubic baseline comparison

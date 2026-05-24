@@ -26,13 +26,15 @@ def apply_log1p_transform(input_dir, output_dir):
 
 
 # ── PATHS ──────────────────────────────────────────────────────────────────────
-#BASE_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
-BASE_DIR = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper"
+BASE_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128"
+#BASE_DIR = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper"
 ERA5_IN    = os.path.join(BASE_DIR, "ERA5_precip_cut")
 CHIRPS_IN  = os.path.join(BASE_DIR, "CHIRPS_precip_cut_obs")
+MSWEP_IN   = os.path.join(BASE_DIR, "MSWEP_precip_cut")
 
 ERA5_OUT   = os.path.join(BASE_DIR, "ERA5_precip_cut_log1p")
 CHIRPS_OUT = os.path.join(BASE_DIR, "CHIRPS_precip_cut_obs_log1p")
+MSWEP_OUT  = os.path.join(BASE_DIR, "MSWEP_precip_cut_log1p")
 
 # ── RUN ────────────────────────────────────────────────────────────────────────
 print("=" * 70)
@@ -41,6 +43,7 @@ print("=" * 70)
 
 apply_log1p_transform(ERA5_IN,   ERA5_OUT)
 apply_log1p_transform(CHIRPS_IN, CHIRPS_OUT)
+apply_log1p_transform(MSWEP_IN,  MSWEP_OUT)
 
 print("\n" + "=" * 70)
 print("DONE!")

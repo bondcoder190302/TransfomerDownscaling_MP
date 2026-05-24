@@ -8,6 +8,7 @@ YEARS = [2015, 2016, 2017, 2018, 2019, 2020]
 
 VARIABLES = [
     'ERA5_PRECIP',
+    'MSWEP_PRECIP',
     'ERA5_U_WIND_10M',
     'ERA5_V_WIND_10M',
     'ERA5_WIND_SPEED_10M',
@@ -92,7 +93,7 @@ print(f"\n{'='*60}")
 print(f"  SUMMARY  ({len(files)} files checked)")
 print(f"{'='*60}")
 if not overall_issues:
-    print("  ✅ All 30 files CLEAN — no NaNs, no negatives.")
+    print("  ✅ All 36 files CLEAN — no NaNs, no negatives.")
 else:
     print(f"  ⚠  {len(overall_issues)} file(s) with issues:\n")
     for issue in overall_issues:
