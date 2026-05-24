@@ -167,7 +167,7 @@ train:
   ssim_opt:
     type: ClimateSSIMLoss
     loss_weight: 5
-    data_range: 5.5280
+    data_range: 5.7310
 
 # validation settings
 val:
@@ -180,12 +180,12 @@ val:
   metrics:
     psnr:
       type: calculate_climate_psnr
-      data_range: 5.5280  # Exact max from your CHIRPS log1p stats
+      data_range: 5.7310  # Exact max from your CHIRPS log1p stats
       crop_border: 0
       better: higher
     ssim:
       type: calculate_climate_ssim
-      data_range: 5.5280
+      data_range: 5.7310
       crop_border: 0
       better: higher
     mse:
