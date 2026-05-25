@@ -583,36 +583,42 @@ class ClimateSRModel(SRModel):
         # 1. Let the framework load the old checkpoint state normally
         super(ClimateSRModel, self).resume_training(resume_state)
         
-        # 2. Extract the new configuration settings from your YAML
-        train_opt = self.opt['train']
-        if 'scheduler' in train_opt and train_opt['scheduler']['type'] == 'MultiStepLR':
-            from collections import Counter
-            new_milestones = train_opt['scheduler'].get('milestones', [])
-            gamma = train_opt['scheduler'].get('gamma', 0.5)
-            base_lr = train_opt['optim_g'].get('lr', 2e-4)
-            
-            # 3. Surgically correct the scheduler and optimizer
-            for scheduler in self.schedulers:
-                if hasattr(scheduler, 'milestones'):
-                    # Overwrite the old binary milestones with the new YAML ones
-                    scheduler.milestones = Counter(new_milestones)
+        # 2. Extract the new configuration settings safely
+        train_opt = self.opt.get('train', {})
+        scheduler_opt = train_opt.get('scheduler', {})
+        
+        # BasicSR deletes 'type' during initialization! 
+        # We skip checking the dictionary and verify the PyTorch object directly.
+        from collections import Counter
+        
+        # Pull your updated Phase 2 milestones directly from the config dictionary
+        # (Defaults provided as a failsafe)
+        new_milestones = scheduler_opt.get('milestones', [26340, 39510, 44778, 50046])
+        gamma = scheduler_opt.get('gamma', 0.5)
+        base_lr = train_opt.get('optim_g', {}).get('lr', 2e-4)
+        
+        # 3. Surgically correct the scheduler and optimizer
+        for scheduler in self.schedulers:
+            # If the scheduler has milestones, we know it's a MultiStepLR!
+            if hasattr(scheduler, 'milestones'):
+                # Overwrite the old binary milestones with the new YAML ones
+                scheduler.milestones = Counter(new_milestones)
+                
+                # Mathematically calculate what the LR *should* be right now
+                current_step = scheduler.last_epoch
+                decay_steps = sum(1 for m in new_milestones if m <= current_step)
+                new_lr = base_lr * (gamma ** decay_steps)
+                
+                # Force the optimizer to adopt this corrected learning rate instantly
+                for param_group in self.optimizer_g.param_groups:
+                    param_group['lr'] = new_lr
                     
-                    # Mathematically calculate what the LR *should* be right now
-                    current_step = scheduler.last_epoch
-                    decay_steps = sum(1 for m in new_milestones if m <= current_step)
-                    new_lr = base_lr * (gamma ** decay_steps)
-                    
-                    # Force the optimizer to adopt this corrected learning rate instantly
-                    for param_group in self.optimizer_g.param_groups:
-                        param_group['lr'] = new_lr
-                        
-                    # Update the scheduler's base memory so future decays compound properly
-                    scheduler.base_lrs = [base_lr for _ in scheduler.base_lrs]
-                    
-                    # Log the successful override to your terminal
-                    logger = get_root_logger()
-                    logger.info(f"🛠️ OVERRIDE: Forced LR to {new_lr} based on new milestones {new_milestones} at step {current_step}")
-
+                # Update the scheduler's base memory so future decays compound properly
+                scheduler.base_lrs = [base_lr for _ in scheduler.base_lrs]
+                
+                # Log the successful override to your terminal
+                logger = get_root_logger()
+                logger.info(f"🛠️ OVERRIDE: Forced LR to {new_lr} based on new milestones {new_milestones} at step {current_step}")
 
 @MODEL_REGISTRY.register()
 class ClimateSRAddHGTModel(ClimateSRModel):
