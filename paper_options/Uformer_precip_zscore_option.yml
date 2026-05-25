@@ -154,7 +154,7 @@ train:
   #     complete the final 60 epochs.
   # ───────────────────────────────────────────────────────────────────────────
   total_iter: 52680 # Hard stop at the halfway mark to beat the 12-hour limit
-  warmup_iter: 1000 # Scaled learning rate warmup to stabilize transformer layers
+  warmup_iter: 500 # Scaled learning rate warmup to stabilize transformer layers
 
   # losses
   pixel_opt:
@@ -167,11 +167,11 @@ train:
   ssim_opt:
     type: ClimateSSIMLoss
     loss_weight: 5
-    data_range: 5.7310
+    data_range: 5.5280
 
 # validation settings
 val:
-  val_freq: 4390
+  val_freq: 439
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -180,12 +180,12 @@ val:
   metrics:
     psnr:
       type: calculate_climate_psnr
-      data_range: 5.7310  # Exact max from your CHIRPS log1p stats
+      data_range: 5.5280  # Exact max from your CHIRPS log1p stats
       crop_border: 0
       better: higher
     ssim:
       type: calculate_climate_ssim
-      data_range: 5.7310
+      data_range: 5.5280
       crop_border: 0
       better: higher
     mse:
@@ -199,9 +199,9 @@ val:
 
 # logging settings
 logger:
-  print_freq: 200
+  print_freq: 100
   save_checkpoint_freq: 4390
-  use_tb_logger: false #true
+  use_tb_logger: false
 
 # dist training settings
 dist_params:
