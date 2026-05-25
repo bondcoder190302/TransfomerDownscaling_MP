@@ -578,6 +578,40 @@ class ClimateSRModel(SRModel):
                 # update the best metric result
                 self._update_best_metric_result(dataset_name, metric, self.metric_results[metric], current_iter)
             self._log_validation_metric_values(current_iter, dataset_name, tb_logger)
+    def resume_training(self, resume_state):
+        """Intercepts BasicSR checkpoint loading to fix the PyTorch MultiStepLR resume bug."""
+        # 1. Let the framework load the old checkpoint state normally
+        super(ClimateSRModel, self).resume_training(resume_state)
+        
+        # 2. Extract the new configuration settings from your YAML
+        train_opt = self.opt['train']
+        if 'scheduler' in train_opt and train_opt['scheduler']['type'] == 'MultiStepLR':
+            from collections import Counter
+            new_milestones = train_opt['scheduler'].get('milestones', [])
+            gamma = train_opt['scheduler'].get('gamma', 0.5)
+            base_lr = train_opt['optim_g'].get('lr', 2e-4)
+            
+            # 3. Surgically correct the scheduler and optimizer
+            for scheduler in self.schedulers:
+                if hasattr(scheduler, 'milestones'):
+                    # Overwrite the old binary milestones with the new YAML ones
+                    scheduler.milestones = Counter(new_milestones)
+                    
+                    # Mathematically calculate what the LR *should* be right now
+                    current_step = scheduler.last_epoch
+                    decay_steps = sum(1 for m in new_milestones if m <= current_step)
+                    new_lr = base_lr * (gamma ** decay_steps)
+                    
+                    # Force the optimizer to adopt this corrected learning rate instantly
+                    for param_group in self.optimizer_g.param_groups:
+                        param_group['lr'] = new_lr
+                        
+                    # Update the scheduler's base memory so future decays compound properly
+                    scheduler.base_lrs = [base_lr for _ in scheduler.base_lrs]
+                    
+                    # Log the successful override to your terminal
+                    logger = get_root_logger()
+                    logger.info(f"🛠️ OVERRIDE: Forced LR to {new_lr} based on new milestones {new_milestones} at step {current_step}")
 
 
 @MODEL_REGISTRY.register()
