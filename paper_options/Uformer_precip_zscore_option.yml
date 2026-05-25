@@ -138,7 +138,7 @@ train:
   scheduler:
     type: MultiStepLR
     # Shift milestones outward so they trigger at true 50%, 75%, 85%, and 95% completion marks
-    milestones: [52680, 79020, 92190, 100970]
+    milestones: [26340, 39510, 44778, 50046]
     gamma: 0.5
   # ── FRAMEWORK & RUNTIME STRATEGY FOR 120-EPOCH LIFECYCLE ───────────────────
   # Due to a bug in BasicSR's multi-GPU Distributed/DataParallel setup, the 
