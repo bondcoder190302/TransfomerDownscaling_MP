@@ -119,7 +119,7 @@ path:
   
   pretrain_network_g: ~ 
   strict_load_g: true
-  resume_state: ./experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder/26340.state
+  resume_state: ./experiments/Uformer_precip_ep120_2e4lr_c128_zscore_x2_hgtxcoder/training_states/26340.state
 
 # training settings
 train:
