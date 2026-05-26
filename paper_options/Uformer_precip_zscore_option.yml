@@ -67,9 +67,9 @@ datasets:
     gt_size: 128
     prefetch_mode: ~
 
-  val:
-    seq_interval: 1
-    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
+  # val:
+  #   seq_interval: 1
+  #   train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
 
   test:
    seq_interval: 1
