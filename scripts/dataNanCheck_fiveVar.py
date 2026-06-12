@@ -2,7 +2,7 @@ import numpy as np
 import rasterio
 import os
 
-OUTPUT_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\All set dataset\here128and64\aligned_fiveVar"
+OUTPUT_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\All set dataset\here128and64\SRTM\SouthAsia_DEM_0p05deg.tif"
 ELEVATION_PATH = r"C:\Users\HP\Downloads\MTP Phase 2\All set dataset\here128and64\SouthAsia_DEM_0p05deg.tif"
 
 YEARS = [2015, 2016, 2017, 2018, 2019, 2020]
