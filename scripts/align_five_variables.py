@@ -73,12 +73,12 @@ YEARS = [2015, 2016, 2017, 2018, 2019, 2020]
 
 VARIABLE_CATALOGUE = [
     # (prefix,                  input_dir,          in_pattern,              tw,        th,        transform,        resampling          )
-    ('ERA5_PRECIP',          INPUT_DIR_FIVEVAR,  '{prefix}_{year}.tif',   ERA5_W,   ERA5_H,   era5_transform,   Resampling.bilinear),
+    ('ERA5_PRECIP',          INPUT_DIR_FIVEVAR,  '{prefix}_{year}.tif',   ERA5_W,   ERA5_H,   era5_transform,   Resampling.nearest),
     ('ERA5_U_WIND_10M',      INPUT_DIR_FIVEVAR,  '{prefix}_{year}.tif',   ERA5_W,   ERA5_H,   era5_transform,   Resampling.bilinear),
     ('ERA5_V_WIND_10M',      INPUT_DIR_FIVEVAR,  '{prefix}_{year}.tif',   ERA5_W,   ERA5_H,   era5_transform,   Resampling.bilinear),
     ('ERA5_WIND_SPEED_10M',  INPUT_DIR_FIVEVAR,  '{prefix}_{year}.tif',   ERA5_W,   ERA5_H,   era5_transform,   Resampling.bilinear),
-    ('MSWEP_PRECIP',         INPUT_DIR_MSWEP,    '{year}_cropped.tif',    ERA5_W,   ERA5_H,   era5_transform,   Resampling.bilinear),
-    ('CHIRPS_PRECIP',        INPUT_DIR_FIVEVAR,  '{prefix}_{year}.tif',   CHIRPS_W, CHIRPS_H, chirps_transform, Resampling.bilinear),
+    ('MSWEP_PRECIP',         INPUT_DIR_MSWEP,    '{year}_cropped.tif',    ERA5_W,   ERA5_H,   era5_transform,   Resampling.nearest),
+    ('CHIRPS_PRECIP',        INPUT_DIR_FIVEVAR,  '{prefix}_{year}.tif',   CHIRPS_W, CHIRPS_H, chirps_transform, Resampling.nearest),
 ]
 
 TOTAL_EXPECTED = len(VARIABLE_CATALOGUE) * len(YEARS)   # 6 × 6 = 36
