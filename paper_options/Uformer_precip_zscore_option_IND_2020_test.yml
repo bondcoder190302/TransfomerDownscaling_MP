@@ -66,13 +66,13 @@ datasets:
     gt_size: 128
     prefetch_mode: ~
 
-  # val:
-  #   seq_interval: 1
-  #   train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt # 37 samples (2020)
+  val:
+    seq_interval: 1
+    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt # 37 samples (2020)
 
-  test:
-   seq_interval: 1
-   train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt # 37 samples (2020)
+  # test:
+  #  seq_interval: 1
+  #  train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt # 37 samples (2020)
 
 # network structures
 network_g:
@@ -109,7 +109,7 @@ path:
   #   - resume_state: ~
   # ────────────────────────────────────────────────────────────────────────────
 
-  pretrain_network_g: ./experiments/Uformer_precip_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder/models/net_g_latest.pth
+  pretrain_network_g: ~ #./experiments/Uformer_precip_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~
 
@@ -145,10 +145,11 @@ train:
     loss_weight: 10
     reduction: sum
     eps: !!float 1e-3
-  ssim_opt:
-    type: ClimateSSIMLoss
-    loss_weight: 1
-    data_range: 6.5211
+  ssim_opt: ~  # Optional; keep null to disable.
+  # ssim_opt:
+  #   type: ClimateSSIMLoss
+  #   loss_weight: 1
+  #   data_range: 6.5211
 
 # validation settings
 val:
