@@ -5,6 +5,8 @@ import math
 from tqdm import tqdm
 from collections import OrderedDict
 import torch.nn.functional as F
+
+import data
 from .climatesr_model import ClimateSRModel, ClimateSRAddHGTModel
 from basicsr.utils.registry import MODEL_REGISTRY
 from basicsr.utils import get_root_logger
@@ -159,11 +161,18 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
 
         self.output = self.output[0][..., :h*scale, :w*scale]
 
+    # def feed_data(self, data):
+    #     super().feed_data(data)
+    #     if 'lsm_lr' in data and 'lsm_hr' in data:
+    #         self.lsm_lr = data['lsm_lr'].to(self.device)
+    #         self.lsm_hr = data['lsm_hr'].to(self.device)
     def feed_data(self, data):
         super().feed_data(data)
-        if 'lsm_lr' in data and 'lsm_hr' in data:
-            self.lsm_lr = data['lsm_lr'].to(self.device)
-            self.lsm_hr = data['lsm_hr'].to(self.device)
+        if 'lsm_hr' in data:
+            # .unsqueeze(1) turns (Batch, H, W) into (Batch, 1, H, W)
+            self.lsm_hr = data['lsm_hr'].to(self.device).unsqueeze(1)
+        if 'lsm_lr' in data:
+            self.lsm_lr = data['lsm_lr'].to(self.device).unsqueeze(1)
 
     def optimize_parameters(self, current_iter):
         logger = get_root_logger()
@@ -254,8 +263,12 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             if not torch.isfinite(l_pix_multi):
                 _skip('non-finite l_pix_multi')
                 return
+            # if hasattr(self, 'lsm_hr') and getattr(self.cri_pix_multiscale, 'reduction', 'mean') == 'sum':
+            #     l_pix_multi = l_pix_multi / norm_factor
             if hasattr(self, 'lsm_hr') and getattr(self.cri_pix_multiscale, 'reduction', 'mean') == 'sum':
-                l_pix_multi = l_pix_multi / norm_factor
+                # Multiply norm_factor by 64 to correctly average across all intermediate channels!
+                num_channels = self.output[1].shape[1]
+                l_pix_multi = l_pix_multi / (norm_factor * num_channels)
             l_total += l_pix_multi
             loss_dict['l_pix_multi'] = l_pix_multi
         # SSIM loss
