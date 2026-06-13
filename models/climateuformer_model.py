@@ -159,6 +159,12 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
 
         self.output = self.output[0][..., :h*scale, :w*scale]
 
+    def feed_data(self, data):
+        super().feed_data(data)
+        if 'lsm_lr' in data and 'lsm_hr' in data:
+            self.lsm_lr = data['lsm_lr'].to(self.device)
+            self.lsm_hr = data['lsm_hr'].to(self.device)
+
     def optimize_parameters(self, current_iter):
         logger = get_root_logger()
         self._total_iters += 1
@@ -214,32 +220,47 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         # gradient signal for those samples.
         # self.output = [v.clamp(-6.0, 6.0) for v in self.output]
         self.output = [v.clamp(-20.0, 20.0) for v in self.output]
+        
+        if hasattr(self, 'lsm_hr'):
+            self.output = [out * self.lsm_hr for out in self.output]
+            gt_lsm = self.gt * self.lsm_hr
+            norm_factor = torch.sum(self.lsm_hr)
+            if norm_factor == 0:
+                norm_factor = 1.0
+        else:
+            gt_lsm = self.gt
+            norm_factor = 1.0  # Fallback if no mask is used
+
         l_total = torch.tensor(0.0, device=self.device)
         loss_dict = OrderedDict()
         # pixel loss
         if self.cri_pix:
-            l_pix = self.cri_pix(self.output[0], self.gt)
+            l_pix = self.cri_pix(self.output[0], gt_lsm)
             if not torch.isfinite(l_pix):
                 _skip('non-finite l_pix')
                 return
+            if hasattr(self, 'lsm_hr') and getattr(self.cri_pix, 'reduction', 'mean') == 'sum':
+                l_pix = l_pix / norm_factor
             l_total += l_pix
             loss_dict['l_pix'] = l_pix
         if self.cri_pix_multiscale:
             # ClimateUformerMultiScaleHGTMultiScaleOut returns 4 outputs:
             # (out, out0, out1, out2). out0/out1/out2 are already upsampled to
             # the final spatial size before fusing, so compare all against self.gt.
-            l_pix_0 = self.cri_pix_multiscale(self.output[1], self.gt)
-            l_pix_1 = self.cri_pix_multiscale(self.output[2], self.gt)
-            l_pix_2 = self.cri_pix_multiscale(self.output[3], self.gt)
+            l_pix_0 = self.cri_pix_multiscale(self.output[1], gt_lsm)
+            l_pix_1 = self.cri_pix_multiscale(self.output[2], gt_lsm)
+            l_pix_2 = self.cri_pix_multiscale(self.output[3], gt_lsm)
             l_pix_multi = l_pix_0 + l_pix_1 + l_pix_2
             if not torch.isfinite(l_pix_multi):
                 _skip('non-finite l_pix_multi')
                 return
+            if hasattr(self, 'lsm_hr') and getattr(self.cri_pix_multiscale, 'reduction', 'mean') == 'sum':
+                l_pix_multi = l_pix_multi / norm_factor
             l_total += l_pix_multi
             loss_dict['l_pix_multi'] = l_pix_multi
         # SSIM loss
         if self.cri_ssim:
-            l_ssim = self.cri_ssim(self.output[0], self.gt)
+            l_ssim = self.cri_ssim(self.output[0], gt_lsm)
             if not torch.isfinite(l_ssim):
                 _skip('non-finite l_ssim')
                 return

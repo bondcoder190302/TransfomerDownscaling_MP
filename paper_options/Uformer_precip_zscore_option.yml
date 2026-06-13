@@ -53,6 +53,8 @@ datasets:
     file_format: 'date'
     # Name of the single static elevation file inside HGT_fix_cut_obs/
     fix_file_name: 'HGT_fix.npy'
+    lsm_lr_path: './DownScale_Paper/LSM_fix/india_lsm_LR.npy'
+    lsm_hr_path: './DownScale_Paper/LSM_fix/india_lsm_HR.npy'
     seq_length: 1
     seq_interval: 1
   train:
@@ -62,7 +64,7 @@ datasets:
     num_worker_per_gpu: 2
     batch_size_per_gpu: 2
     dataset_enlarge_ratio: 1
-    randomcrop: false
+    randomcrop: true
     # Full HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
     gt_size: 128
     prefetch_mode: ~
@@ -160,7 +162,7 @@ train:
   pixel_opt:
     type: CharbonnierLoss
     loss_weight: 10
-    reduction: mean
+    reduction: sum
     eps: !!float 1e-3  # Perceptual loss with a fixed VGG-based feature extractor (no training signal to the extractor).
   # ssim_opt: ~  # Optional; keep null to disable.
   # To enable differentiable SSIM loss, use:
