@@ -77,6 +77,13 @@ class MergeDataset(RadarDataset):
         self.interval = 1
         self.logger = get_root_logger()
         self.var_stats_dict = self.init_stat()
+        
+        self.lsm_lr_path = opt.get('lsm_lr_path', None)
+        self.lsm_hr_path = opt.get('lsm_hr_path', None)
+        if self.lsm_lr_path is not None and self.lsm_hr_path is not None:
+            if os.path.exists(self.lsm_lr_path) and os.path.exists(self.lsm_hr_path):
+                self.lsm_lr = np.load(self.lsm_lr_path)
+                self.lsm_hr = np.load(self.lsm_hr_path)
 
     def init_stat(self):
         var_stats_dict = {}
@@ -201,25 +208,54 @@ class MergeDataset(RadarDataset):
         target_data = np.array(target_seq)
         radar_data = np.array(radar_seq)
         hgt_obs_data = np.array(hgt_obs_data)
+        
+        has_lsm = hasattr(self, 'lsm_lr') and hasattr(self, 'lsm_hr')
+        if has_lsm:
+            lsm_lr = self.lsm_lr
+            lsm_hr = self.lsm_hr
+
         if self.opt['phase'] == 'train' and self.opt.get('randomcrop', False):
             gt_size = self.opt['gt_size']
             #random crop
-            img_gt, img_lq = paired_random_crop([target_data, hgt_obs_data], [radar_data], gt_size, scale)
-            target_data, hgt_obs_data = img_gt
-            radar_data = img_lq[0]
+            if has_lsm:
+                while True:
+                    img_gt, img_lq = paired_random_crop([target_data, hgt_obs_data, lsm_hr], [radar_data, lsm_lr], gt_size, scale)
+                    target_data_c, hgt_obs_data_c, lsm_hr_c = img_gt
+                    radar_data_c, lsm_lr_c = img_lq
+                    if lsm_lr_c.sum() > 0:
+                        target_data, hgt_obs_data, lsm_hr = target_data_c, hgt_obs_data_c, lsm_hr_c
+                        radar_data, lsm_lr = radar_data_c, lsm_lr_c
+                        break
+            else:
+                img_gt, img_lq = paired_random_crop([target_data, hgt_obs_data], [radar_data], gt_size, scale)
+                target_data, hgt_obs_data = img_gt
+                radar_data = img_lq[0]
+
         if 'val' in self.opt['phase'] or 'test' in self.opt['phase']:
             gt_size = self.opt.get('gt_size', target_data.shape[-1])
-            img_gt, img_lq = paired_fixed_crop([target_data, hgt_obs_data], [radar_data], gt_size, scale)
-            target_data, hgt_obs_data = img_gt
-            radar_data = img_lq[0]
+            if has_lsm:
+                img_gt, img_lq = paired_fixed_crop([target_data, hgt_obs_data, lsm_hr], [radar_data, lsm_lr], gt_size, scale)
+                target_data, hgt_obs_data, lsm_hr = img_gt
+                radar_data, lsm_lr = img_lq
+            else:
+                img_gt, img_lq = paired_fixed_crop([target_data, hgt_obs_data], [radar_data], gt_size, scale)
+                target_data, hgt_obs_data = img_gt
+                radar_data = img_lq[0]
 
         if self.opt['phase'] == 'train' and self.opt.get('use_flip', False) and self.opt.get('use_rot', False):
-            target_data, radar_data, hgt_obs_data = \
-                augment([target_data, radar_data, hgt_obs_data], self.opt['use_flip'], self.opt['use_rot'])
+            if has_lsm:
+                target_data, radar_data, hgt_obs_data, lsm_hr, lsm_lr = \
+                    augment([target_data, radar_data, hgt_obs_data, lsm_hr, lsm_lr], self.opt['use_flip'], self.opt['use_rot'])
+            else:
+                target_data, radar_data, hgt_obs_data = \
+                    augment([target_data, radar_data, hgt_obs_data], self.opt['use_flip'], self.opt['use_rot'])
 
         target_data = torch.from_numpy(np.ascontiguousarray(target_data)).float()
         radar_data = torch.from_numpy(np.ascontiguousarray(radar_data)).float()
         hgt_obs_data = torch.from_numpy(np.ascontiguousarray(hgt_obs_data)).float()
 
-        info = [time]
-        return {'lq': radar_data, 'gt': target_data, 'hgt': hgt_obs_data, 'info': info}
+        ret = {'lq': radar_data, 'gt': target_data, 'hgt': hgt_obs_data, 'info': [time]}
+        if has_lsm:
+            ret['lsm_lr'] = torch.from_numpy(np.ascontiguousarray(lsm_lr)).float()
+            ret['lsm_hr'] = torch.from_numpy(np.ascontiguousarray(lsm_hr)).float()
+        return ret
