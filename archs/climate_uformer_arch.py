@@ -1037,14 +1037,53 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
             conv2 = conv2 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous()
 
         #Decoder
+        # B, L, C = conv2.shape
+        # H2 = W2 = self.reso // 4
+        # if L != H2 * W2:
+        #     raise RuntimeError(
+        #         f'Token length mismatch at conv2: L={L}, expected H2*W2={H2}*{W2}={H2 * W2}'
+        #     )
+        # out0 = self.scale0_outconv(conv2.transpose(1, 2).reshape(B, C, H2, W2))
+        # _assert_finite('out0_pre_interp', out0)
+        # up0 = self.upsample_0(conv2) #embed_dim*2
+        # _assert_finite('up0', up0)
+        # if self.add_hgt and self.multi_add_pos == 'decoder':
+        #     up0 = up0 + hgt_feat[2].flatten(2).transpose(1, 2).contiguous()
+        # deconv0 = torch.cat([up0,conv1],-1)
+        # deconv0 = self.decoderlayer_0(deconv0,mask=mask)
+        # _assert_finite('deconv0', deconv0)
+
+        # B, L, C = deconv0.shape
+        # H1 = W1 = self.reso // 2
+        # if L != H1 * W1:
+        #     raise RuntimeError(
+        #         f'Token length mismatch at deconv0: L={L}, expected H1*W1={H1}*{W1}={H1 * W1}'
+        #     )
+        # out1 = self.scale1_outconv(deconv0.transpose(1, 2).reshape(B, C, H1, W1))
+        # _assert_finite('out1_pre_interp', out1)
+        # up1 = self.upsample_1(deconv0) # embed_dim*1
+        # _assert_finite('up1', up1)
+        # if self.add_hgt and self.multi_add_pos == 'decoder':
+        #     up1 = up1 + hgt_feat[1].flatten(2).transpose(1, 2).contiguous()
+        # deconv1 = torch.cat([up1,conv0],-1)
+        # deconv1 = self.decoderlayer_1(deconv1,mask=mask)
+        # _assert_finite('deconv1', deconv1)
+
+        # B, L, C = deconv1.shape
+        # H0 = W0 = self.reso
+        # if L != H0 * W0:
+        #     raise RuntimeError(
+        #         f'Token length mismatch at deconv1: L={L}, expected H0*W0={H0}*{W0}={H0 * W0}'
+        #     )
+        # out2 = self.scale2_outconv(deconv1.transpose(1, 2).reshape(B, C, H0, W0))
+        # _assert_finite('out2_pre_interp', out2)
+        #Decoder
         B, L, C = conv2.shape
-        H2 = W2 = self.reso // 4
-        if L != H2 * W2:
-            raise RuntimeError(
-                f'Token length mismatch at conv2: L={L}, expected H2*W2={H2}*{W2}={H2 * W2}'
-            )
+        H2 = int(math.sqrt(L))
+        W2 = int(math.sqrt(L))
         out0 = self.scale0_outconv(conv2.transpose(1, 2).reshape(B, C, H2, W2))
         _assert_finite('out0_pre_interp', out0)
+        
         up0 = self.upsample_0(conv2) #embed_dim*2
         _assert_finite('up0', up0)
         if self.add_hgt and self.multi_add_pos == 'decoder':
@@ -1054,13 +1093,11 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         _assert_finite('deconv0', deconv0)
 
         B, L, C = deconv0.shape
-        H1 = W1 = self.reso // 2
-        if L != H1 * W1:
-            raise RuntimeError(
-                f'Token length mismatch at deconv0: L={L}, expected H1*W1={H1}*{W1}={H1 * W1}'
-            )
+        H1 = int(math.sqrt(L))
+        W1 = int(math.sqrt(L))
         out1 = self.scale1_outconv(deconv0.transpose(1, 2).reshape(B, C, H1, W1))
         _assert_finite('out1_pre_interp', out1)
+        
         up1 = self.upsample_1(deconv0) # embed_dim*1
         _assert_finite('up1', up1)
         if self.add_hgt and self.multi_add_pos == 'decoder':
@@ -1070,11 +1107,8 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         _assert_finite('deconv1', deconv1)
 
         B, L, C = deconv1.shape
-        H0 = W0 = self.reso
-        if L != H0 * W0:
-            raise RuntimeError(
-                f'Token length mismatch at deconv1: L={L}, expected H0*W0={H0}*{W0}={H0 * W0}'
-            )
+        H0 = int(math.sqrt(L))
+        W0 = int(math.sqrt(L))
         out2 = self.scale2_outconv(deconv1.transpose(1, 2).reshape(B, C, H0, W0))
         _assert_finite('out2_pre_interp', out2)
 
