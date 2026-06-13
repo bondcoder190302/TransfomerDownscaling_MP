@@ -99,12 +99,40 @@ def _ssim_compute(
     ssim_idx = ((2 * mu_pred_target + c1) * upper) / ((mu_pred_sq + mu_target_sq + c1) * lower)
     ssim_idx = ssim_idx[..., pad_h:-pad_h, pad_w:-pad_w]
 
+    # if mask is not None:
+    #     valid_ssim = ssim_idx[mask.expand_as(ssim_idx)]
+    #     if valid_ssim.numel() > 0:
+    #         return valid_ssim.mean()
+    #     else:
+    #         return torch.tensor(1.0, device=preds.device)
+
+    # return ssim_idx.mean()
     if mask is not None:
-        valid_ssim = ssim_idx[mask.expand_as(ssim_idx)]
+        mask = mask.bool() # Ensure mask is a boolean tensor
+        
+        # Calculate how many pixels the SSIM window shaved off Height and Width
+        h_diff = mask.shape[-2] - ssim_idx.shape[-2]
+        w_diff = mask.shape[-1] - ssim_idx.shape[-1]
+        
+        # Center-crop the mask so its edges perfectly match the shrunken SSIM map
+        if h_diff > 0 or w_diff > 0:
+            pad_top = h_diff // 2
+            pad_bottom = h_diff - pad_top
+            pad_left = w_diff // 2
+            pad_right = w_diff - pad_left
+            
+            mask_cropped = mask[..., pad_top : mask.shape[-2] - pad_bottom, pad_left : mask.shape[-1] - pad_right]
+        else:
+            mask_cropped = mask
+            
+        # Apply the perfectly aligned mask
+        valid_ssim = ssim_idx[mask_cropped.expand_as(ssim_idx)]
+        
         if valid_ssim.numel() > 0:
             return valid_ssim.mean()
         else:
-            return torch.tensor(1.0, device=preds.device)
+            # Fallback if no valid land pixels are left in the crop
+            return torch.tensor(1.0, device=ssim_idx.device)
 
     return ssim_idx.mean()
 
