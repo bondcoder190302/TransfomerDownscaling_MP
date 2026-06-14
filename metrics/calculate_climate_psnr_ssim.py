@@ -2,6 +2,20 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from basicsr.utils.registry import METRIC_REGISTRY
+import os
+
+_LSM_HR_CACHE = None
+
+def _get_lsm_mask(device, shape):
+    global _LSM_HR_CACHE
+    if _LSM_HR_CACHE is None:
+        lsm_path = './DownScale_Paper/LSM_fix/india_lsm_HR.npy'
+        if os.path.exists(lsm_path):
+            lsm = np.load(lsm_path)
+            _LSM_HR_CACHE = torch.from_numpy(lsm).float().to(device)
+        else:
+            _LSM_HR_CACHE = torch.ones(shape, device=device) # Dummy fallback
+    return _LSM_HR_CACHE > 0.5
 
 def _gaussian(kernel_size, sigma, dtype: torch.dtype, device: torch.device):
     """Computes 1D gaussian kernel.
@@ -47,6 +61,7 @@ def _ssim_compute(
         preds,
         target,
         data_range,
+        mask=None,
         kernel_size = (11, 11),
         sigma = (1.5, 1.5),
         k1 = 0.01,
@@ -84,6 +99,41 @@ def _ssim_compute(
     ssim_idx = ((2 * mu_pred_target + c1) * upper) / ((mu_pred_sq + mu_target_sq + c1) * lower)
     ssim_idx = ssim_idx[..., pad_h:-pad_h, pad_w:-pad_w]
 
+    # if mask is not None:
+    #     valid_ssim = ssim_idx[mask.expand_as(ssim_idx)]
+    #     if valid_ssim.numel() > 0:
+    #         return valid_ssim.mean()
+    #     else:
+    #         return torch.tensor(1.0, device=preds.device)
+
+    # return ssim_idx.mean()
+    if mask is not None:
+        mask = mask.bool() # Ensure mask is a boolean tensor
+        
+        # Calculate how many pixels the SSIM window shaved off Height and Width
+        h_diff = mask.shape[-2] - ssim_idx.shape[-2]
+        w_diff = mask.shape[-1] - ssim_idx.shape[-1]
+        
+        # Center-crop the mask so its edges perfectly match the shrunken SSIM map
+        if h_diff > 0 or w_diff > 0:
+            pad_top = h_diff // 2
+            pad_bottom = h_diff - pad_top
+            pad_left = w_diff // 2
+            pad_right = w_diff - pad_left
+            
+            mask_cropped = mask[..., pad_top : mask.shape[-2] - pad_bottom, pad_left : mask.shape[-1] - pad_right]
+        else:
+            mask_cropped = mask
+            
+        # Apply the perfectly aligned mask
+        valid_ssim = ssim_idx[mask_cropped.expand_as(ssim_idx)]
+        
+        if valid_ssim.numel() > 0:
+            return valid_ssim.mean()
+        else:
+            # Fallback if no valid land pixels are left in the crop
+            return torch.tensor(1.0, device=ssim_idx.device)
+
     return ssim_idx.mean()
 
 @METRIC_REGISTRY.register()
@@ -118,6 +168,10 @@ def calculate_climate_ssim(img, img2, crop_border, **kwargs):
         img = img[..., crop_border:-crop_border, crop_border:-crop_border]
         img2 = img2[..., crop_border:-crop_border, crop_border:-crop_border]
 
+    mask = _get_lsm_mask(img.device, img.shape[-2:])
+    if mask.ndim == 2:
+        mask = mask.unsqueeze(0).unsqueeze(0)
+
     global_data_range = kwargs.get('data_range', None)
     ssims = []
     channels = img.shape[1]
@@ -130,7 +184,7 @@ def calculate_climate_ssim(img, img2, crop_border, **kwargs):
             ssims.append(torch.tensor(1.0, device=img.device)) # Perfect similarity for zero-mask
             continue
             
-        ssim = _ssim_compute(input, target, dr)
+        ssim = _ssim_compute(input, target, dr, mask=mask[:, [c]] if mask.shape[1] > 1 else mask)
         ssims.append(ssim)
         
     return ssims
@@ -179,6 +233,11 @@ def calculate_climate_psnr(img, img2, crop_border, **kwargs):
     # Get global range from YAML; fallback to dynamic only if missing
     global_data_range = kwargs.get('data_range', None)
 
+    mask = _get_lsm_mask(img.device, img.shape[-2:])
+    if mask.ndim == 2:
+        mask = mask.unsqueeze(0).unsqueeze(0)
+    mask = mask.expand_as(img)
+
     psnrs = []
     channels = img.shape[1]
     for c in range(channels):
@@ -192,11 +251,16 @@ def calculate_climate_psnr(img, img2, crop_border, **kwargs):
             psnrs.append(torch.tensor(0.0, device=img.device))
             continue
 
-        mse = F.mse_loss(input, target)
-        if mse < 1e-10:
-            psnr = torch.tensor(100.0, device=img.device) # Perfect match
+        input_valid = input[mask[:, [c]]]
+        target_valid = target[mask[:, [c]]]
+        if input_valid.numel() > 0:
+            mse = F.mse_loss(input_valid, target_valid)
+            if mse < 1e-10:
+                psnr = torch.tensor(100.0, device=img.device) # Perfect match
+            else:
+                psnr = 20 * torch.log10(dr / mse.sqrt())
         else:
-            psnr = 20 * torch.log10(dr / mse.sqrt())
+            psnr = torch.tensor(0.0, device=img.device)
         psnrs.append(psnr)
 
     return psnrs

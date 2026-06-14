@@ -15,18 +15,24 @@ import datetime
 import random
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-SPLIT_DIR  = r"C:\Users\HP\Downloads\MTP_repo\TransfomerDownscaling_MP\DownScale_Paper\DownScale_Correction_split"
+SPLIT_DIR  = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128\DownScale_Correction_split"
 
-START_DATE = datetime.date(2015, 1, 1)
+# START_DATE = datetime.date(2015, 1, 1)
+# END_DATE   = datetime.date(2020, 12, 31)
+START_DATE = datetime.date(2020, 1, 1)
 END_DATE   = datetime.date(2020, 12, 31)
 
 RANDOM_SEED = 42   # fix seed → same split every run
 
 # 80 / 10 / 10 split over 2192 days
 #temp 731 days for 2015 and 2016
-TRAIN_SIZE = 1754
-VAL_SIZE   = 219
-# TEST_SIZE  = 2192 - 1754 - 219 = 219
+# TRAIN_SIZE = 1754
+# VAL_SIZE   = 219
+# # TEST_SIZE  = 2192 - 1754 - 219 = 219
+
+# 80 / 10 / 10 split over 366 days (Year 2020)
+TRAIN_SIZE = 292
+VAL_SIZE   = 37
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def date_range(start: datetime.date, end: datetime.date):
@@ -45,8 +51,8 @@ if __name__ == "__main__":
     indices   = list(range(n))
 
     print(f"Total days : {n}  ({START_DATE} – {END_DATE})")
-    assert n == 2192, f"Expected 2192 days for 6-year period, got {n}"
-
+    # assert n == 2192, f"Expected 2192 days for 6-year period, got {n}"
+    assert n == 366, f"Expected 366 days for 2020, got {n}"
     # ── Random shuffle ────────────────────────────────────────────────────────
     random.seed(RANDOM_SEED)
     shuffled = indices.copy()
