@@ -59,8 +59,8 @@ datasets:
     # dataloader
     use_shuffle: true
     num_worker_per_gpu: 2
-    batch_size_per_gpu: 2
-    dataset_enlarge_ratio: 1
+    batch_size_per_gpu: 3
+    dataset_enlarge_ratio: 2
     randomcrop: true
     # Full HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
     gt_size: 128
@@ -132,12 +132,14 @@ train:
   # is expressed in REAL iteration units (based on 1460).
   scheduler:
     type: MultiStepLR
-    # 50% / 75% / 85% / 95% of 1460 (real iterations)
-    milestones: [730, 1095, 1241, 1387]
+    # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your 1,960 target
+    milestones: [980, 1470, 1666, 1862]
     gamma: 0.5
 
-  total_iter: 2920 # = 2 * 1460 real iterations (5 epochs)
-  warmup_iter: 50 # real-iteration units (~3% of 1460)
+  # TRICK FOR BASICSR: Doubled to 3920. 
+  # The model will actually run for exactly 20 real epochs (1,960 iterations) and stop cleanly.
+  total_iter: 3920
+  warmup_iter: 50
 
   # losses
   pixel_opt:
@@ -145,15 +147,16 @@ train:
     loss_weight: 10
     reduction: sum
     eps: !!float 1e-3
-  ssim_opt: ~  # Optional; keep null to disable.
-  # ssim_opt:
-  #   type: ClimateSSIMLoss
-  #   loss_weight: 1
-  #   data_range: 6.5211
+  # ssim_opt: ~  # Optional; keep null to disable.
+  ssim_opt:
+    type: ClimateSSIMLoss
+    loss_weight: 1
+    data_range: 6.5211
 
 # validation settings
 val:
-  val_freq: 146 # real-iteration units; ~10 validation runs over 1460
+  # REAL iterations: Validate exactly 1 time per epoch
+  val_freq: 98
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -182,7 +185,7 @@ val:
 # logging settings
 logger:
   print_freq: 20
-  save_checkpoint_freq: 146 # real-iteration units; one checkpoint ~every half-epoch
+  save_checkpoint_freq: 98 # real-iteration units; one checkpoint ~every half-epoch
   use_tb_logger: false
 
 # dist training settings

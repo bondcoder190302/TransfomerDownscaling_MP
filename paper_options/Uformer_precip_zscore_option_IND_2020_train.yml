@@ -132,11 +132,13 @@ train:
   # is expressed in REAL iteration units (based on 1460).
   scheduler:
     type: MultiStepLR
-    # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your 11,700 target
-    milestones: [5850, 8775, 9945, 11115]
+    # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your 1,960 target
+    milestones: [980, 1470, 1666, 1862]
     gamma: 0.5
 
-  total_iter: 23400
+  # TRICK FOR BASICSR: Doubled to 3920. 
+  # The model will actually run for exactly 20 real epochs (1,960 iterations) and stop cleanly.
+  total_iter: 3920
   warmup_iter: 50
 
   # losses
@@ -154,7 +156,7 @@ train:
 # validation settings
 val:
   # REAL iterations: Validate exactly 1 time per epoch
-  val_freq: 585
+  val_freq: 98
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -183,7 +185,7 @@ val:
 # logging settings
 logger:
   print_freq: 20
-  save_checkpoint_freq: 585 # real-iteration units; one checkpoint ~every half-epoch
+  save_checkpoint_freq: 98 # real-iteration units; one checkpoint ~every half-epoch
   use_tb_logger: false
 
 # dist training settings
