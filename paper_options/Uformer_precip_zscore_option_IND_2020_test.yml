@@ -7,7 +7,7 @@
 #
 # Data split (2020 only): TRAIN=292, VAL=37, TEST=37  (total 366 days, leap year)
 
-name: Uformer_precip_win16_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder
+name: Uformer_precip_win8_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder
 model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
 num_gpu: 2 # set num_gpu: 0 for cpu mode
@@ -82,7 +82,7 @@ network_g:
   num_in_ch: 4 # MSWEP precipitation + ERA5 10 m wind speed/u/v
   num_out_ch: 1 # CHIRPS precipitation (1 channel)
   img_size: 64 # LR input spatial size (gt_size / scale = 128 / 2)
-  window_size: 16
+  window_size: 8
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
   num_heads: [4, 8, 16, 16, 8]
@@ -109,7 +109,7 @@ path:
   #   - resume_state: ~
   # ────────────────────────────────────────────────────────────────────────────
 
-  pretrain_network_g: ./experiments/Uformer_precip_win16_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder/models/net_g_latest.pth
+  pretrain_network_g: ./experiments/Uformer_precip_win8_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~
 
