@@ -121,10 +121,10 @@ train:
   scheduler:
     type: MultiStepLR
     # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
-    milestones: [16440, 24660, 27948, 31236]
+    milestones: [13155, 19732, 22363, 24994]
     gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 32880
+  total_iter: 26310
   warmup_iter: -1 #10
 
   # losses
@@ -141,7 +141,7 @@ train:
 
 # validation settings
 val:
-  val_freq: 1096
+  val_freq: 877
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -170,7 +170,7 @@ val:
 # logging settings
 logger:
   print_freq: 20
-  save_checkpoint_freq: 1096
+  save_checkpoint_freq: 877
   use_tb_logger: false
 
 # dist training settings
