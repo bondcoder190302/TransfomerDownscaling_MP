@@ -173,7 +173,7 @@ val:
 
 # logging settings
 logger:
-  print_freq: 73
+  print_freq: 1
   save_checkpoint_freq: 146 # real-iteration units; one checkpoint ~every half-epoch
   use_tb_logger: false
 
