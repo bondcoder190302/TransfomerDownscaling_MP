@@ -119,13 +119,13 @@ train:
     type: Adam
     lr: !!float 2e-4
     betas: [0.9, 0.95]
-    eps: !!float 1e-6
+    eps: !!float 1e-6 #can be removed but it prevents division by zero and reduces instability when gradients are tiny or noisy.
 
   scheduler:
     type: MultiStepLR
     # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
     milestones: [365, 548, 621, 694]
-    gamma: 0.5
+    gamma: 0.5 #decay LR by half at each milestone
 
   total_iter: 730
   warmup_iter: -1 #10
@@ -135,7 +135,7 @@ train:
     type: CharbonnierLoss
     loss_weight: 10
     reduction: sum
-    eps: !!float 1e-3
+    eps: !!float 1e-3 # can be removed. Charbonnier epsilon; prevents instability when pixel differences are tiny.
   ssim_opt: ~  # Optional; keep null to disable.
   # ssim_opt:
   #   type: ClimateSSIMLoss

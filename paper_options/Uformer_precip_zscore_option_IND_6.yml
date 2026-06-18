@@ -1,13 +1,16 @@
-# Configuration for single-variable precipitation downscaling.
-# PIPELINE SMOKE TEST — YEAR 2020 ONLY
-# Input : ERA5 Land daily precipitation at 0.1° (36x36 for region [76,21,79.2,24.2])
-# Target: CHIRPS daily precipitation at 0.05° (64x64)
-# Auxiliary: Copernicus GLO-90 DEM elevation (64x64, static)
+# Configuration for precipitation downscaling.
+# Years: six, 2015 to 2020, total days: 2192 (leap years 2016 and 2020)
+# Study region: India ([62.2998717527286487, 1.3000558348497222, 100.6998717527286544, 39.7000558348497279])
+# Input : MSWEP precipitation at 0.1° (384x384)
+#         ERA5 Land daily Wind at 0.1° (384x384)
+# Target: CHIRPS daily precipitation at 0.05° (768x768)
+# Auxiliary: Copernicus GLO-90 DEM elevation (768x768, static),
+#            India Land sea mask HR (768x768, static),
+#            India Land sea mask LR (384x384, static)
 # Scale factor: 2× (0.1° → 0.05°)
-#
-# Data split (2020 only): TRAIN=292, VAL=37, TEST=37  (total 366 days, leap year)
+# Data split (6 year): TRAIN=1754, VAL=219, TEST=219
 
-name: Uformer_precip_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder
+name: Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128
 model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
 num_gpu: 2 # set num_gpu: 0 for cpu mode
@@ -21,7 +24,7 @@ freeze_layernorm: false
 
 # LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations
 # then automatically unfreeze them. Real-iteration units.
-ln_freeze_iters: 100
+ln_freeze_iters: 0 #10
 
 # dataset and data loader settings
 datasets:
@@ -31,12 +34,6 @@ datasets:
     dirName_stat: ./DownScale_Paper/param_stat_12_36/
     dirName_data: ./DownScale_Paper/
     # Inputs: MSWEP precipitation (log1p) + ERA5 10 m wind speed/u/v (raw, no log1p)
-    # Stats are loaded from varName.replace('_cut','').replace('_fix','') + '_stat.pkl':
-    #   MSWEP_precip_log1p_stat.pkl
-    #   ERA5_wind_speed_10m_stat.pkl
-    #   ERA5_u_wind_10m_stat.pkl
-    #   ERA5_v_wind_10m_stat.pkl
-    # add ERA5_precip_cut_log1p to listofVar and varName_gt when want to use ERA5 land precip
     listofVar: [MSWEP_precip_cut_log1p, ERA5_wind_speed_10m_cut, ERA5_u_wind_10m_cut, ERA5_v_wind_10m_cut]
     # CHIRPS precipitation is the super-resolution target (1 channel)
     varName_gt: [CHIRPS_precip_cut_obs_log1p]
@@ -59,20 +56,20 @@ datasets:
     # dataloader
     use_shuffle: true
     num_worker_per_gpu: 2
-    batch_size_per_gpu: 2
-    dataset_enlarge_ratio: 2
+    batch_size_per_gpu: 4
+    dataset_enlarge_ratio: 4
     randomcrop: true
-    # Full HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
+    # HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
     gt_size: 128
     prefetch_mode: ~
 
   val:
     seq_interval: 1
-    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt # 37 samples (2020)
+    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
 
   # test:
   #  seq_interval: 1
-  #  train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt # 37 samples (2020)
+  #  train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
 
 # network structures
 network_g:
@@ -82,7 +79,7 @@ network_g:
   num_in_ch: 4 # MSWEP precipitation + ERA5 10 m wind speed/u/v
   num_out_ch: 1 # CHIRPS precipitation (1 channel)
   img_size: 64 # LR input spatial size (gt_size / scale = 128 / 2)
-  window_size: 8
+  window_size: 16
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
   num_heads: [4, 8, 16, 16, 8]
@@ -109,7 +106,7 @@ path:
   #   - resume_state: ~
   # ────────────────────────────────────────────────────────────────────────────
 
-  pretrain_network_g: ./experiments/Uformer_precip_TEST2020_ep5_2e4lr_c128_zscore_x2_hgtxcoder/models/net_g_latest.pth
+  pretrain_network_g: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~
 
@@ -119,32 +116,23 @@ train:
     type: Adam
     lr: !!float 2e-4
     betas: [0.9, 0.95]
-    eps: !!float 1e-6
+    eps: !!float 1e-6 #can be removed but it prevents division by zero and reduces instability when gradients are tiny or noisy.
 
-  # ── SMOKE TEST ITERATION BUDGET ──────────────────────────────────────────
-  # TRAIN_SIZE = 292, batch_size_per_gpu = 2  →  146 nominal steps/epoch,
-  # x2 for the BasicSR DataParallel epoch-loop bug → ~292 real steps/epoch.
-  # For 5 epochs: REAL iterations = 5 * 292 = 1460.
-  #
-  # total_iter is the ONLY field doubled (BasicSR's internal counter runs
-  # 2x too fast, so it needs 2x the real target to actually reach 1460).
-  # Everything else below (milestones, warmup, val_freq, checkpoint_freq)
-  # is expressed in REAL iteration units (based on 1460).
   scheduler:
     type: MultiStepLR
-    # 50% / 75% / 85% / 95% of 1460 (real iterations)
-    milestones: [730, 1095, 1241, 1387]
-    gamma: 0.5
+    # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
+    milestones: [16440, 24660, 27948, 31236]
+    gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 2920 # = 2 * 1460 real iterations (5 epochs)
-  warmup_iter: 50 # real-iteration units (~3% of 1460)
+  total_iter: 32880
+  warmup_iter: -1 #10
 
   # losses
   pixel_opt:
     type: CharbonnierLoss
     loss_weight: 10
     reduction: sum
-    eps: !!float 1e-3
+    eps: !!float 1e-3 # can be removed. Charbonnier epsilon; prevents instability when pixel differences are tiny.
   ssim_opt: ~  # Optional; keep null to disable.
   # ssim_opt:
   #   type: ClimateSSIMLoss
@@ -153,7 +141,7 @@ train:
 
 # validation settings
 val:
-  val_freq: 146 # real-iteration units; ~10 validation runs over 1460
+  val_freq: 1096
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -182,7 +170,7 @@ val:
 # logging settings
 logger:
   print_freq: 20
-  save_checkpoint_freq: 146 # real-iteration units; one checkpoint ~every half-epoch
+  save_checkpoint_freq: 1096
   use_tb_logger: false
 
 # dist training settings

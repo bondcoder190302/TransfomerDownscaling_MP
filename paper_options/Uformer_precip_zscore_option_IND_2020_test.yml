@@ -21,7 +21,7 @@ freeze_layernorm: false
 
 # LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations
 # then automatically unfreeze them. Real-iteration units.
-ln_freeze_iters: 10
+ln_freeze_iters: 0 #10
 
 # dataset and data loader settings
 datasets:
@@ -119,23 +119,23 @@ train:
     type: Adam
     lr: !!float 2e-4
     betas: [0.9, 0.95]
-    eps: !!float 1e-6
+    eps: !!float 1e-6 #can be removed but it prevents division by zero and reduces instability when gradients are tiny or noisy.
 
   scheduler:
     type: MultiStepLR
     # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
     milestones: [365, 548, 621, 694]
-    gamma: 0.5
+    gamma: 0.5 #decay LR by half at each milestone
 
   total_iter: 730
-  warmup_iter: 10
+  warmup_iter: -1 #10
 
   # losses
   pixel_opt:
     type: CharbonnierLoss
     loss_weight: 10
     reduction: sum
-    eps: !!float 1e-3
+    eps: !!float 1e-3 # can be removed. Charbonnier epsilon; prevents instability when pixel differences are tiny.
   ssim_opt: ~  # Optional; keep null to disable.
   # ssim_opt:
   #   type: ClimateSSIMLoss
@@ -173,7 +173,7 @@ val:
 
 # logging settings
 logger:
-  print_freq: 73
+  print_freq: 1
   save_checkpoint_freq: 146 # real-iteration units; one checkpoint ~every half-epoch
   use_tb_logger: false
 
