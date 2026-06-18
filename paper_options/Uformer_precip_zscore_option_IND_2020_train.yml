@@ -21,7 +21,7 @@ freeze_layernorm: false
 
 # LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations
 # then automatically unfreeze them. Real-iteration units.
-ln_freeze_iters: 10
+ln_freeze_iters: 0 #10
 
 # dataset and data loader settings
 datasets:
@@ -128,7 +128,7 @@ train:
     gamma: 0.5
 
   total_iter: 730
-  warmup_iter: 10
+  warmup_iter: -1 #10
 
   # losses
   pixel_opt:
