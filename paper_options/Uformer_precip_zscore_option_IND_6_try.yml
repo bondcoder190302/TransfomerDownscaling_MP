@@ -108,7 +108,7 @@ path:
 
   pretrain_network_g: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/models/net_g_latest.pth
   strict_load_g: true
-  resume_state: ./experiment-uformer-2015-2020-multivar-lsm-ep120/experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/training_states/13155.state
+  resume_state: ~
 
 # training settings
 train:
@@ -124,7 +124,7 @@ train:
     milestones: [13155, 19732, 22363, 24994]
     gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 26310 #13155
+  total_iter: 13155 #26310
   warmup_iter: -1 #10
 
   # losses
