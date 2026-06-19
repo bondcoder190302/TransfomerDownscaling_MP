@@ -108,7 +108,7 @@ path:
 
   pretrain_network_g: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/models/net_g_latest.pth
   strict_load_g: true
-  resume_state: ./experiment-uformer-2015-2020-multivar-lsm-ep120/experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/training_states/13155.state
+  resume_state: ./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/training_states/13155.state
 
 # training settings
 train:
