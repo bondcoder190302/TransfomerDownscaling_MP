@@ -4,7 +4,7 @@ import numpy as np
 
 # ── LOCAL PATHS ─────────────────────────────────────────────────────────────
 ALIGNED_DIR = r"C:\Users\HP\Downloads\MTP Phase 2\All set dataset\here128and64\aligned_fiveVar"
-OUTPUT_DIR  = r"C:\Users\HP\Downloads\MTP Phase 2\All set dataset\here128and64\SRTM"
+OUTPUT_DIR  = r"C:\Users\HP\Downloads\MTP Phase 2\NPY_new_128\LSM_fix"
 
 # We use 2015 as the structural anchor. 
 # Make sure these filenames match exactly what your alignment script produced!

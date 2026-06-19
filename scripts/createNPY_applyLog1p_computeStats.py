@@ -21,11 +21,11 @@ YEARS = [2015, 2016, 2017, 2018, 2019, 2020]
 # ── 2. VARIABLE CONFIGURATION ─────────────────────────────────────────────────
 # Maps the dataset prefix to its target folder, log1p requirement, and stat name
 VARIABLE_CONFIG = {
-    'ERA5_PRECIP': {
-        'out_folder': 'ERA5_precip_cut_log1p',
-        'log1p': True,
-        'stat_name': 'ERA5_precip_log1p_stat.pkl'
-    },
+    # 'ERA5_PRECIP': {
+    #     'out_folder': 'ERA5_precip_cut_log1p',
+    #     'log1p': True,
+    #     'stat_name': 'ERA5_precip_log1p_stat.pkl'
+    # },
     'MSWEP_PRECIP': {
         'out_folder': 'MSWEP_precip_cut_log1p',
         'log1p': True,
