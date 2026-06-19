@@ -31,7 +31,7 @@ datasets:
   common:
     name: Precip
     type: MergeDataset
-    dirName_stat: ./DownScale_Paper/param_stat_12_36/
+    dirName_stat: ./DownScale_Paper/param_stat/
     dirName_data: ./DownScale_Paper/
     # Inputs: MSWEP precipitation (log1p) + ERA5 10 m wind speed/u/v (raw, no log1p)
     listofVar: [MSWEP_precip_cut_log1p, ERA5_wind_speed_10m_cut, ERA5_u_wind_10m_cut, ERA5_v_wind_10m_cut]
