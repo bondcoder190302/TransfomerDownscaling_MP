@@ -124,7 +124,7 @@ train:
     milestones: [13155, 19732, 22363, 24994]
     gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 26310
+  total_iter: 13155 #26310
   warmup_iter: -1 #10
 
   # losses
