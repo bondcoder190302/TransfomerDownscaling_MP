@@ -10,7 +10,7 @@
 # Scale factor: 2× (0.1° → 0.05°)
 # Data split (6 year): TRAIN=1754, VAL=219, TEST=219
 
-name: Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128
+name: Uformer_2015_2020_Multivar_LSM_ep120_ssim1
 model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
 num_gpu: 2 # set num_gpu: 0 for cpu mode
@@ -56,7 +56,7 @@ datasets:
     # dataloader
     use_shuffle: true
     num_worker_per_gpu: 2
-    batch_size_per_gpu: 4
+    batch_size_per_gpu: 3
     dataset_enlarge_ratio: 4
     randomcrop: true
     # HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
@@ -106,9 +106,9 @@ path:
   #   - resume_state: ~
   # ────────────────────────────────────────────────────────────────────────────
 
-  pretrain_network_g: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/models/net_g_latest.pth
+  pretrain_network_g: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_ssim1/models/net_g_latest.pth
   strict_load_g: true
-  resume_state: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/training_states/13155.state
+  resume_state: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_ssim1/training_states/13155.state
 
 # training settings
 train:
@@ -121,10 +121,10 @@ train:
   scheduler:
     type: MultiStepLR
     # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
-    milestones: [13155, 19732, 22363, 24994]
+    milestones: [17540, 26310, 29818, 33326]
     gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 13155 #26310
+  total_iter: 17540 #35080
   warmup_iter: -1 #10
 
   # losses
@@ -141,7 +141,7 @@ train:
 
 # validation settings
 val:
-  val_freq: 877
+  val_freq: 1170
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -170,7 +170,7 @@ val:
 # logging settings
 logger:
   print_freq: 20
-  save_checkpoint_freq: 877
+  save_checkpoint_freq: 1170
   use_tb_logger: false
 
 # dist training settings
