@@ -3,146 +3,95 @@ import torch.nn.functional as F
 from torch import nn
 from basicsr.utils.registry import LOSS_REGISTRY
 
-
 @LOSS_REGISTRY.register()
 class MaskedExtremeWeightedCharbonnierLoss(nn.Module):
     """
-    Masked Charbonnier Loss with higher penalties for extreme precipitation events.
+    Masked Charbonnier Loss with dynamic penalties for extreme precipitation events.
     
-    Operates on log1p + z-score normalised CHIRPS targets.
-
-    Three components
-    ----------------
-    1. Masked Charbonnier  – standard smooth-L1 restricted to land pixels.
-    2. Normalised extreme ramp – weight = 1 + (extreme_weight - 1) * excess / extreme_threshold
-       This is bounded: at excess == extreme_threshold the multiplier reaches exactly
-       extreme_weight, then continues to grow linearly beyond that.
-       (The old formula `1 + extreme_weight * excess` reached extreme_weight × threshold
-       at the same point, making it ~2.8× more aggressive than intended.)
-    3. Soft wet-day BCE (optional, disabled by default) – adds a binary cross-entropy
-       term that penalises disagreement on rain occurrence, addressing the dry-day
-       imbalance independently of intensity errors.
-
-    Ocean-pixel epsilon fix
-    -----------------------
-    When the land-sea mask is applied *externally* in optimize_parameters (both
-    self.output and gt_lsm are multiplied by lsm_hr before reaching this loss),
-    ocean pixels arrive here with pred == 0 and target == 0 exactly.  Charbonnier
-    with eps > 0 gives sqrt(eps) ≈ 0.032 even for a perfect 0-0 prediction, which
-    leaks systematically into the sum loss.  We detect those pixels via
-    `(target != 0.0)` and zero-out their contribution.
-    Land dry-pixels are safe: their z-score is (log1p(0) – mean)/std ≈ -0.44, never
-    exactly 0.
-
-    YAML example
-    ------------
-    pixel_opt:
-      type: MaskedExtremeWeightedCharbonnierLoss
-      loss_weight: 10
-      reduction: sum          # norm_factor division is applied in optimize_parameters
-      eps: !!float 1e-3
-      extreme_threshold: 2.773   # >20 mm/day in CHIRPS log-z-score space
-      extreme_weight: 5.0        # at exactly the threshold, weight = extreme_weight
-      wet_weight: 0.0            # set > 0 (e.g. 0.5) to enable occurrence BCE term
-      wet_threshold: -0.9        # z-score of the dry/wet boundary (compute from stats pkl)
-      wet_scale: 0.3             # sigmoid temperature for soft wet-day boundary
+    This loss function is designed specifically for precipitation downscaling where 
+    the target variables (e.g., CHIRPS) have been log1p transformed and Z-score 
+    normalized. 
+    
+    Ocean pixels are handled naturally without explicit masking inside this class: 
+    because the Land-Sea Mask (LSM) is multiplied to both the prediction and target 
+    in the main model class before loss calculation, ocean pixels arrive as exactly 0.0. 
+    The Charbonnier epsilon is squared mathematically to prevent NaN gradients on 
+    these zeroed-out ocean pixels during backpropagation.
     """
-
-    def __init__(
-        self,
-        loss_weight=1.0,
-        reduction='mean',
-        eps=1e-3,
-        extreme_threshold=2.773,
-        extreme_weight=5.0,
-        wet_weight=0.0,
-        wet_threshold=-0.9,
-        wet_scale=0.3,
-    ):
-        super().__init__()
+    def __init__(self, loss_weight=1.0, reduction='sum', eps=1e-3, 
+                 extreme_threshold=2.89, extreme_weight=3.0,
+                 wet_weight=0.0, wet_threshold=-0.8, wet_scale=0.5):
+        """
+        Args:
+            loss_weight (float): Global multiplier applied to the final reduced loss.
+            reduction (str): Specifies the reduction to apply to the output: 
+                             'sum' | 'mean' | 'none'. Default: 'sum'.
+            eps (float): Epsilon value to prevent division by zero in Charbonnier 
+                         loss derivative. Default: 1e-3.
+            extreme_threshold (float): The log-z-score value above which the extreme 
+                                       penalty starts ramping up. (e.g., 2.89 represents 
+                                       the 90th percentile of CHIRPS precipitation).
+            extreme_weight (float): The penalty multiplier applied to the loss when 
+                                    rainfall reaches or exceeds the threshold.
+            wet_weight (float): Weight for the optional wet-day occurrence BCE loss. 
+                                Set to 0.0 to disable. Default: 0.0.
+            wet_threshold (float): Z-score boundary separating dry days from wet days.
+            wet_scale (float): Temperature scaling factor for the BCE sigmoid function.
+        """
+        super(MaskedExtremeWeightedCharbonnierLoss, self).__init__()
         self.loss_weight = loss_weight
         self.reduction = reduction
         self.eps = eps
+        
         self.extreme_threshold = extreme_threshold
         self.extreme_weight = extreme_weight
+        
         self.wet_weight = wet_weight
         self.wet_threshold = wet_threshold
         self.wet_scale = wet_scale
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _reduce(self, loss, valid_mask):
-        """Reduce a pixel-wise loss tensor using the given valid-pixel mask."""
-        if valid_mask is not None:
-            loss = loss * valid_mask
-            if self.reduction == 'mean':
-                n_valid = valid_mask.sum().clamp_min(1.0)
-                return loss.sum() / n_valid
-            elif self.reduction == 'sum':
-                return loss.sum()
-            else:
-                return loss
-        else:
-            if self.reduction == 'mean':
-                return loss.mean()
-            elif self.reduction == 'sum':
-                return loss.sum()
-            else:
-                return loss
-
-    # ------------------------------------------------------------------
-    # Forward
-    # ------------------------------------------------------------------
-
-    def forward(self, pred, target, mask=None, **kwargs):
+    def forward(self, pred, target, **kwargs):
         """
         Args:
-            pred   (Tensor): model output  (B, C, H, W), log-z-score space
-            target (Tensor): ground truth  (B, C, H, W), log-z-score space
-            mask   (Tensor, optional): explicit land-sea mask (B, 1, H, W).
-                   1 = land, 0 = ocean.  If None, ocean pixels are auto-detected
-                   from target == 0.0 (valid when lsm masking is applied upstream).
+            pred (Tensor): Predicted precipitation tensor of shape (B, C, H, W).
+            target (Tensor): Ground truth precipitation tensor of shape (B, C, H, W).
+            
+        Returns:
+            Tensor: The calculated loss scalar (if reduction is sum/mean) or map.
         """
-        # ── 1. Build valid-pixel mask ──────────────────────────────────────────
-        if mask is not None:
-            # Explicit mask provided (e.g., called directly with lsm_hr)
-            valid_mask = mask.float()
-            if valid_mask.shape != target.shape:
-                valid_mask = valid_mask.expand_as(target)
-        else:
-            # Auto-detect ocean pixels: lsm was applied externally so ocean = 0.0 exactly.
-            # Land dry-pixels have z-score ≈ -0.44, never exactly 0.
-            valid_mask = (target != 0.0).float()
-            # Safety: if everything is non-zero (no external masking), use all pixels
-            if valid_mask.all():
-                valid_mask = None
-
-        # ── 2. Charbonnier base loss ───────────────────────────────────────────
-        base_loss = torch.sqrt((pred - target) ** 2 + self.eps)
-
-        # ── 3. Normalised extreme-event weighting ramp ─────────────────────────
-        # At excess == 0          → weight = 1.0  (no change for moderate rainfall)
-        # At excess == threshold  → weight = extreme_weight  (exactly)
-        # Beyond threshold        → weight grows linearly (unbounded but gradual)
+        # 1. Base Charbonnier Loss
+        # We square the epsilon (self.eps**2) inside the square root. For ocean pixels 
+        # where pred = 0.0 and target = 0.0, this prevents a 0/0 gradient singularity.
+        base_loss = torch.sqrt((pred - target)**2 + self.eps**2)
+        
+        # 2. Normalised Extreme-Event Weighting Ramp
+        # Evaluates the ground truth target. If target > extreme_threshold, the penalty 
+        # multiplier scales smoothly instead of applying a harsh step function.
+        # This normalisation prevents gradient explosion at high extremes.
         excess = torch.relu(target - self.extreme_threshold)
-        weight_map = 1.0 + (self.extreme_weight - 1.0) * excess / self.extreme_threshold
-
+        weight_map = 1.0 + (self.extreme_weight - 1.0) * (excess / self.extreme_threshold)
+        
+        # Apply the penalty multiplier to the base Charbonnier loss map
         weighted_loss = base_loss * weight_map
-
-        # ── 4. Reduce Charbonnier component ───────────────────────────────────
-        final_loss = self._reduce(weighted_loss, valid_mask)
-
-        # ── 5. Optional soft wet-day BCE ──────────────────────────────────────
+        
+        # 3. Optional Soft Wet-Day BCE (Disabled if wet_weight == 0.0)
+        # Penalizes the model for missing the occurrence of rain entirely (dry vs wet).
         if self.wet_weight > 0.0:
             gt_wet = torch.sigmoid((target - self.wet_threshold) / self.wet_scale)
-            pr_wet = torch.sigmoid((pred   - self.wet_threshold) / self.wet_scale)
-            # Use gt_wet.detach() so the occurrence term only trains the prediction side
-            occ_loss = F.binary_cross_entropy(
-                pr_wet, gt_wet.detach(), reduction='none'
-            )
-            occ_reduced = self._reduce(occ_loss, valid_mask)
-            final_loss = final_loss + self.wet_weight * occ_reduced
+            pr_wet = torch.sigmoid((pred - self.wet_threshold) / self.wet_scale)
+            
+            # Detach the target soft-labels so gradients only flow through the prediction
+            occ_loss = F.binary_cross_entropy(pr_wet, gt_wet.detach(), reduction='none')
+            total_loss = weighted_loss + (self.wet_weight * occ_loss)
+        else:
+            total_loss = weighted_loss
 
-        return final_loss * self.loss_weight
+        # 4. Built-in Reduction
+        # We use standard PyTorch reductions since the model architecture handles 
+        # spatial ocean masking independently prior to the loss call.
+        if self.reduction == 'sum':
+            return self.loss_weight * total_loss.sum()
+        elif self.reduction == 'mean':
+            return self.loss_weight * total_loss.mean()
+        else:
+            return self.loss_weight * total_loss
