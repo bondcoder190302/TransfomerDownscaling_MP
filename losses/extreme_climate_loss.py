@@ -159,7 +159,8 @@ class MaskedExtremeWeightedCharbonnierLoss(nn.Module):
         if self.wet_weight > 0.0:
             pred_logits = (pred   - self.wet_threshold) / self.wet_scale
             tgt_logits  = (target - self.wet_threshold) / self.wet_scale
-            gt_wet      = torch.sigmoid(tgt_logits).detach()  # soft label
+            # expand_as broadcasts (B,1,H,W) → (B,C,H,W) so BCE shape matches pred
+            gt_wet      = torch.sigmoid(tgt_logits).expand_as(pred_logits).detach()
             occ_loss    = F.binary_cross_entropy_with_logits(
                 pred_logits, gt_wet, reduction='none'
             )
