@@ -143,12 +143,11 @@ train:
     loss_weight: 10
     reduction: sum
     eps: !!float 1e-3
-    extreme_threshold: 2.773   # >20 mm/day
-    extreme_weight: 5.0        # saturates at 2×threshold (~289 mm/day)
-    low_threshold: 0.88        # <2.5 mm/day (wet-day boundary, Chandel P10)
-    low_weight: 2.0            # Chandel r1 — penalise false-rain predictions
-    wet_weight: 0.0
-    wet_threshold: -0.4414     # log1p(0mm) z-scored (was wrongly -0.9)
+    extreme_threshold: 3.1916
+    extreme_weight: 1.5
+    under_weight: 1.5             # Asymmetric penalty for under-prediction
+    wet_weight: 0.5               # BCE weight for spatial coverage
+    wet_threshold: -0.4414
     wet_scale: 0.3
 
   # ── MULTISCALE AUXILIARY LOSS ─────────────────────────────────────────────
@@ -161,14 +160,13 @@ train:
   # Use identical loss type/params but a separate instance with lower loss_weight.
   pixel_multiscale_opt:
     type: MaskedExtremeWeightedCharbonnierLoss
-    loss_weight: 5            # half the primary loss weight for auxiliary outputs
+    loss_weight: 5
     reduction: sum
     eps: !!float 1e-3
-    extreme_threshold: 2.773
-    extreme_weight: 5.0
-    low_threshold: 0.88
-    low_weight: 2.0
-    wet_weight: 0.0
+    extreme_threshold: 3.1916
+    extreme_weight: 1.5
+    under_weight: 1.5             
+    wet_weight: 0.5
     wet_threshold: -0.4414
     wet_scale: 0.3
 
