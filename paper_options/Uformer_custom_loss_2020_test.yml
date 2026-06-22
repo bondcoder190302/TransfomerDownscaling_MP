@@ -1,75 +1,62 @@
 # Configuration for precipitation downscaling.
-# Years: six, 2015 to 2020, total days: 2192 (leap years 2016 and 2020)
-# Study region: India ([62.2998717527286487, 1.3000558348497222, 100.6998717527286544, 39.7000558348497279])
+# Years: 2020 only (smoke-test / ablation run)
+# Study region: India ([62.30, 1.30, 100.70, 39.70])
 # Input : MSWEP precipitation at 0.1° (384x384)
-#         ERA5 Land daily Wind at 0.1° (384x384)
+#         ERA5 Land daily Wind speed/u/v at 0.1° (384x384)
 # Target: CHIRPS daily precipitation at 0.05° (768x768)
-# Auxiliary: Copernicus GLO-90 DEM elevation (768x768, static),
-#            India Land sea mask HR (768x768, static),
-#            India Land sea mask LR (384x384, static)
+# Auxiliary: Copernicus GLO-90 DEM elevation (768x768, static)
+#            India Land-Sea Mask HR (768x768), LR (384x384), both static
 # Scale factor: 2× (0.1° → 0.05°)
-# Data split (6 year): TRAIN=1754, VAL=219, TEST=219
-
-name: Uformer_2020_custom_loss
+# Data split (2020): TRAIN=292, VAL=37, TEST=37
+ 
+name: Uformer_2020_v2_asymloss
 model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
-num_gpu: 2 # set num_gpu: 0 for cpu mode
+num_gpu: 2
 manual_seed: 0
 fp16: false
-
-# Debug / stability flags (all off by default; set true only for debugging)
+ 
 anomaly_detection: false
 finite_debug: false
 freeze_layernorm: false
-
-# LayerNorm affine warmup freeze: freeze LN affine params for the first N iterations
-# then automatically unfreeze them. Real-iteration units.
-ln_freeze_iters: 0 #10
-
-# dataset and data loader settings
+ln_freeze_iters: 0
+ 
+# ── DATASETS ──────────────────────────────────────────────────────────────────
 datasets:
   common:
     name: Precip
     type: MergeDataset
     dirName_stat: ./DownScale_Paper/param_stat/
     dirName_data: ./DownScale_Paper/
-    # Inputs: MSWEP precipitation (log1p) + ERA5 10 m wind speed/u/v (raw, no log1p)
     listofVar: [MSWEP_precip_cut_log1p, ERA5_wind_speed_10m_cut, ERA5_u_wind_10m_cut, ERA5_v_wind_10m_cut]
-    # CHIRPS precipitation is the super-resolution target (1 channel)
     varName_gt: [CHIRPS_precip_cut_obs_log1p]
-    # Maps model output channel 0 → listofVar[0] for bicubic baseline comparison
     index_gt: [0]
     radar_file: ./DownScale_Paper/DownScale_Correction_split/data.txt
     normalize: 'zscore'
-    # Copernicus DEM elevation used as auxiliary static input
     hgt_obs: 'HGT_fix_cut_obs'
-    # 'date' format: each .npy file is named YYYYMMDD.npy (no area/lead-hour suffix)
     file_format: 'date'
-    # Name of the single static elevation file inside HGT_fix_cut_obs/
     fix_file_name: 'HGT_fix.npy'
     lsm_lr_path: './DownScale_Paper/LSM_fix/india_lsm_LR.npy'
     lsm_hr_path: './DownScale_Paper/LSM_fix/india_lsm_HR.npy'
     seq_length: 1
     seq_interval: 1
+ 
   train:
-    train_file: ./DownScale_Paper/DownScale_Correction_split/train_12_36.txt # 292 samples (2020)
-    # dataloader
+    train_file: ./DownScale_Paper/DownScale_Correction_split/train_12_36.txt
     use_shuffle: true
     num_worker_per_gpu: 2
     batch_size_per_gpu: 4
     dataset_enlarge_ratio: 4
     randomcrop: true
-    # HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
     gt_size: 128
     prefetch_mode: ~
-
-  # val:
-  #   seq_interval: 1
-  #   train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
-
-  test:
-   seq_interval: 1
-   train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
+ 
+  val:
+    seq_interval: 1
+    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
+  # test:
+  #  seq_interval: 1
+  #  train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
 
 # network structures
 network_g:
@@ -110,51 +97,70 @@ path:
   strict_load_g: true
   resume_state: ~ #./experiments/Uformer_2020_custom_loss/training_states/13155.state
 
-# training settings
+# ── TRAINING ──────────────────────────────────────────────────────────────────
 train:
   optim_g:
     type: Adam
     lr: !!float 2e-4
     betas: [0.9, 0.95]
-    eps: !!float 1e-6 #can be removed but it prevents division by zero and reduces instability when gradients are tiny or noisy.
-
+    eps: !!float 1e-6
+ 
   scheduler:
     type: MultiStepLR
-    # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
-    milestones: [730, 1095, 1315, 1460]
-    gamma: 0.5 #decay LR by half at each milestone
-
-  total_iter: 1460
-  warmup_iter: -1 #10
-
-  # ── PRIMARY PIXEL LOSS ────────────────────────────────────────────────────
-  # FIXED from original:
-  #   1. Weight formula: weight = 1 + (extreme_weight-1) * excess / extreme_threshold
-  #      → at exactly the threshold the multiplier equals extreme_weight (5.0x here).
-  #      Old formula 1 + extreme_weight * excess reached 14.87x at the same point,
-  #      making gradients ~3x more aggressive than intended.
-  #   2. Ocean pixel epsilon leak: auto-detection via (target != 0.0) now excludes
-  #      ocean pixels from the Charbonnier sum even when mask is not passed explicitly.
-  #   3. wet_weight: 0.0 means the BCE occurrence term is OFF (stable default).
-  #      Set wet_weight: 0.5 and compute your wet_threshold to enable it:
-  #        python -c "import pickle,math; s=pickle.load(open('...CHIRPS_precip_obs_log1p_stat.pkl','rb')); print((0-s['mean'].item())/math.sqrt(s['var'].item()))"
+    # Drop LR at 50%, 75%, 85%, 95% of total iterations
+    milestones: [730, 1095, 1241, 1387]
+    gamma: 0.5
+ 
+  total_iter: 1460   # ~5 epochs on 2020 data
+  warmup_iter: -1
+ 
+  # ── PRIMARY PIXEL LOSS ──────────────────────────────────────────────────────
+  #
+  # Threshold values (all in log1p + z-score space):
+  #   CHIRPS stats: mean=0.4180, std=0.9470
+  #
+  #   extreme_threshold = 3.1916
+  #     → wet-day P90 computed from 2192 days × India land pixels
+  #     → physical value ≈ 30.2 mm/day (heavy monsoon rain)
+  #     → formula: (log1p(30.2) - 0.4180) / 0.9470
+  #
+  #   wet_threshold = -0.4414
+  #     → z-score of exactly 0 mm/day
+  #     → formula: (log1p(0.0) - 0.4180) / 0.9470
+  #     → ocean pixels are forced to z=0.0 by LSM; real dry land pixels sit
+  #       at z=-0.4414; so this boundary is at the true dry-day edge.
+  #
+  #   low_threshold = -0.4414, low_weight = 1.0
+  #     → DISABLED (code skips this branch when low_weight == 1.0)
+  #     → kept for documentation; remove or set low_weight > 1.0 to enable
+  #
+  # under_weight = 1.5
+  #   → Multiplies the Charbonnier weight by 1.5 when pred < target.
+  #   → Addresses the confirmed dry bias (log-space: -0.18, heavy-day: -20 mm).
+  #   → Effect: extreme under-predicted pixel gets weight = extreme_weight * under_weight = 2.25×
+  #   → If validation bias flips positive (wet bias), reduce to 1.2–1.3.
+  #
+  # wet_weight = 0.5
+  #   → Enables the soft BCE occurrence term (wet/dry spatial accuracy).
+  #   → If training loss becomes unstable (NaN / large spikes), reduce to 0.2.
+  #
   pixel_opt:
     type: MaskedExtremeWeightedCharbonnierLoss
     loss_weight: 10
     reduction: sum
     eps: !!float 1e-3
-    extreme_threshold: 3.1916
-    extreme_weight: 1.5
-    under_weight: 1.5
-
-  # ── MULTISCALE AUXILIARY LOSS ─────────────────────────────────────────────
-  # FIX: ClimateUformerMultiScaleHGTMultiScaleOut returns 4 outputs:
-  #   output[0] = fused final output  (supervised by pixel_opt above)
-  #   output[1..3] = out0, out1, out2 (intermediate decoder scales)
-  # Without pixel_multiscale_opt these three intermediate outputs get NO direct
-  # gradient signal (only indirect signal through conv_fuse). Adding this
-  # ensures all four outputs are explicitly supervised.
-  # Use identical loss type/params but a separate instance with lower loss_weight.
+    extreme_threshold: 3.1916   # z-score of wet-day P90 ≈ 30.2 mm/day
+    extreme_weight: 1.5         # Chandel r2; weight saturates here
+    under_weight: 1.5           # asymmetric under-prediction penalty
+    low_threshold: -0.4414      # z-score of 0 mm/day (DISABLED — low_weight=1.0)
+    low_weight: 1.0             # 1.0 disables lower-tail branch
+    wet_weight: 0.5             # BCE occurrence term weight; reduce to 0.2 if unstable
+    wet_threshold: -0.4414      # z-score of 0 mm/day (wet/dry boundary)
+    wet_scale: 0.3              # sigmoid temperature: sharp but smooth boundary
+ 
+  # ── MULTISCALE AUXILIARY LOSS ──────────────────────────────────────────────
+  # Supervises the 3 intermediate decoder outputs (out0, out1, out2).
+  # Identical type/params but half the loss_weight of the primary loss.
   pixel_multiscale_opt:
     type: MaskedExtremeWeightedCharbonnierLoss
     loss_weight: 5
@@ -163,22 +169,25 @@ train:
     extreme_threshold: 3.1916
     extreme_weight: 1.5
     under_weight: 1.5
-
-  # ── OPTIONAL SSIM LOSS ────────────────────────────────────────────────────
-  ssim_opt: ~  # Keep null to disable. Enable for spatial-structure supervision:
-  # ssim_opt:
-  #   type: ClimateSSIMLoss
-  #   loss_weight: 1
-  #   data_range: 6.5211
-
-# validation settings
+    low_threshold: -0.4414
+    low_weight: 1.0
+    wet_weight: 0.5
+    wet_threshold: -0.4414
+    wet_scale: 0.3
+ 
+  # ── SSIM LOSS ─────────────────────────────────────────────────────────────
+  ssim_opt: ~   # disabled; enable only after verifying loss stability above
+    # type: ClimateSSIMLoss
+    # loss_weight: 1
+    # data_range: 6.5211 
+# ── VALIDATION ────────────────────────────────────────────────────────────────
 val:
-  val_freq: 146
+  val_freq: 146   # validate once per epoch
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
   pbar: true
-
+ 
   metrics:
     psnr:
       type: calculate_climate_psnr
@@ -198,14 +207,14 @@ val:
       type: calculate_climate_mae
       crop_border: 0
       better: lower
-
-# logging settings
+ 
+# ── LOGGING ───────────────────────────────────────────────────────────────────
 logger:
   print_freq: 20
   save_checkpoint_freq: 146
   use_tb_logger: false
-
-# dist training settings
+ 
+# ── DISTRIBUTED TRAINING ──────────────────────────────────────────────────────
 dist_params:
   backend: nccl
   port: 29500
