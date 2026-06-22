@@ -106,7 +106,7 @@ path:
   #   - resume_state: ~
   # ────────────────────────────────────────────────────────────────────────────
 
-  pretrain_network_g: ~ #./experiments/Uformer_2020_custom_loss/models/net_g_latest.pth
+  pretrain_network_g: ./experiments/Uformer_2020_custom_loss/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~ #./experiments/Uformer_2020_custom_loss/training_states/13155.state
 
