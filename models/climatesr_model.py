@@ -285,7 +285,7 @@ class ClimateSRModel(SRModel):
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h ,w)
             # Clip to 1s in normalized space before denormalization
-            output = torch.clamp(output, -4.0, 4.0)
+            output = torch.clamp(output, -20.0, 20.0)
             target = self.gt.reshape(-1, c, h ,w)
             if isinstance(self.lq, dict):
                 if 'lq' in self.lq:
@@ -456,7 +456,7 @@ class ClimateSRModel(SRModel):
             c, h, w = self.gt.shape[-3:]
             output = self.output.reshape(-1, c, h, w)
             # Clip to 1s in normalized space before denormalization
-            output = torch.clamp(output, -4.0, 4.0)
+            output = torch.clamp(output, -20.0, 20.0)
             target = self.gt.reshape(-1, c, h, w)
             if isinstance(self.lq, dict):
                 if 'lq' in self.lq:
