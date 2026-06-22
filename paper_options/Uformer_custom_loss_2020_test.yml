@@ -121,10 +121,10 @@ train:
   scheduler:
     type: MultiStepLR
     # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
-    milestones: [1095, 1642, 1861, 2080]
+    milestones: [730, 1095, 1315, 1460]
     gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 2190
+  total_iter: 1460
   warmup_iter: -1 #10
 
   # ── PRIMARY PIXEL LOSS ────────────────────────────────────────────────────
