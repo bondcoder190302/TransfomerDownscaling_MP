@@ -145,10 +145,7 @@ train:
     eps: !!float 1e-3
     extreme_threshold: 3.1916
     extreme_weight: 1.5
-    under_weight: 1.5             # Asymmetric penalty for under-prediction
-    wet_weight: 0.5               # BCE weight for spatial coverage
-    wet_threshold: -0.4414
-    wet_scale: 0.3
+    under_weight: 1.5
 
   # ── MULTISCALE AUXILIARY LOSS ─────────────────────────────────────────────
   # FIX: ClimateUformerMultiScaleHGTMultiScaleOut returns 4 outputs:
@@ -165,10 +162,7 @@ train:
     eps: !!float 1e-3
     extreme_threshold: 3.1916
     extreme_weight: 1.5
-    under_weight: 1.5             
-    wet_weight: 0.5
-    wet_threshold: -0.4414
-    wet_scale: 0.3
+    under_weight: 1.5
 
   # ── OPTIONAL SSIM LOSS ────────────────────────────────────────────────────
   ssim_opt: ~  # Keep null to disable. Enable for spatial-structure supervision:
