@@ -56,7 +56,7 @@ datasets:
     # dataloader
     use_shuffle: true
     num_worker_per_gpu: 2
-    batch_size_per_gpu: 3
+    batch_size_per_gpu: 4
     dataset_enlarge_ratio: 4
     randomcrop: true
     # HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
@@ -124,7 +124,7 @@ train:
     milestones: [13155, 19732, 22363, 24994]
     gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 26310 #13155
+  total_iter: 13155 #26310
   warmup_iter: -1 #10
 
   # ── PRIMARY PIXEL LOSS ────────────────────────────────────────────────────

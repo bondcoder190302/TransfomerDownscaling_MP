@@ -10,7 +10,7 @@
 # Scale factor: 2× (0.1° → 0.05°)
 # Data split (6 year): TRAIN=1754, VAL=219, TEST=219
 
-name: Uformer_2020_Multivar_LSM_ep120_2e4lr_c128
+name: Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128
 model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
 num_gpu: 2 # set num_gpu: 0 for cpu mode
@@ -56,7 +56,7 @@ datasets:
     # dataloader
     use_shuffle: true
     num_worker_per_gpu: 2
-    batch_size_per_gpu: 3
+    batch_size_per_gpu: 4
     dataset_enlarge_ratio: 4
     randomcrop: true
     # HR image size (128 px at 0.05°); LQ crop = gt_size / scale = 64
@@ -106,9 +106,9 @@ path:
   #   - resume_state: ~
   # ────────────────────────────────────────────────────────────────────────────
 
-  pretrain_network_g: ~ #./experiments/Uformer_2020_Multivar_LSM_ep120_2e4lr_c128/models/net_g_latest.pth
+  pretrain_network_g: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/models/net_g_latest.pth
   strict_load_g: true
-  resume_state: ~ #./experiments/Uformer_2020_Multivar_LSM_ep120_2e4lr_c128/training_states/13155.state
+  resume_state: ~ #./experiments/Uformer_2015_2020_Multivar_LSM_ep120_2e4lr_c128/training_states/13155.state
 
 # training settings
 train:
@@ -121,10 +121,10 @@ train:
   scheduler:
     type: MultiStepLR
     # REAL iterations: Drop LR at 50%, 75%, 85%, and 95% of your total iterations
-    milestones: [1460, 2190, 2482, 2774]
+    milestones: [730, 1095, 1241, 1387]
     gamma: 0.5 #decay LR by half at each milestone
 
-  total_iter: 2920
+  total_iter: 1460
   warmup_iter: -1 #10
 
   # ── PRIMARY PIXEL LOSS ────────────────────────────────────────────────────
@@ -141,13 +141,15 @@ train:
   pixel_opt:
     type: MaskedExtremeWeightedCharbonnierLoss
     loss_weight: 10
-    reduction: sum            # norm_factor division is applied in optimize_parameters
+    reduction: sum
     eps: !!float 1e-3
-    extreme_threshold: 2.773  # >20 mm/day in CHIRPS log-z-score space
-    extreme_weight: 5.0       # at exactly the threshold, multiplier = 5.0x (not ~15x)
-    wet_weight: 0.0           # 0.0 = disabled; set 0.5 to add occurrence BCE term
-    wet_threshold: -0.9       # z-score of log1p(0) for CHIRPS (compute from stat pkl)
-    wet_scale: 0.3            # sigmoid temperature for soft wet-day boundary
+    extreme_threshold: 2.773   # >20 mm/day
+    extreme_weight: 5.0        # saturates at 2×threshold (~289 mm/day)
+    low_threshold: 0.88        # <2.5 mm/day (wet-day boundary, Chandel P10)
+    low_weight: 2.0            # Chandel r1 — penalise false-rain predictions
+    wet_weight: 0.0
+    wet_threshold: -0.4414     # log1p(0mm) z-scored (was wrongly -0.9)
+    wet_scale: 0.3
 
   # ── MULTISCALE AUXILIARY LOSS ─────────────────────────────────────────────
   # FIX: ClimateUformerMultiScaleHGTMultiScaleOut returns 4 outputs:
@@ -164,8 +166,10 @@ train:
     eps: !!float 1e-3
     extreme_threshold: 2.773
     extreme_weight: 5.0
+    low_threshold: 0.88
+    low_weight: 2.0
     wet_weight: 0.0
-    wet_threshold: -0.9
+    wet_threshold: -0.4414
     wet_scale: 0.3
 
   # ── OPTIONAL SSIM LOSS ────────────────────────────────────────────────────
@@ -177,7 +181,7 @@ train:
 
 # validation settings
 val:
-  val_freq: 195
+  val_freq: 146
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
@@ -206,7 +210,7 @@ val:
 # logging settings
 logger:
   print_freq: 20
-  save_checkpoint_freq: 195
+  save_checkpoint_freq: 146
   use_tb_logger: false
 
 # dist training settings
