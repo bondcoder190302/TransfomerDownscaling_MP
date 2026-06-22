@@ -8,11 +8,13 @@ class MaskedExtremeWeightedCharbonnierLoss(nn.Module):
     """
     Masked Charbonnier Loss with dynamic penalties for extreme precipitation events
     and an asymmetric penalty for under-prediction to fix negative dry bias.
+    
+    This implementation safely broadcasts 1-channel targets to 64-channel predictions
+    for multiscale deep supervision.
     """
     def __init__(self, loss_weight=1.0, reduction='sum', eps=1e-3, 
                  extreme_threshold=3.1916, extreme_weight=1.5,
-                 under_weight=1.5,
-                 wet_weight=0.5, wet_threshold=-0.4414, wet_scale=0.3):
+                 under_weight=1.5):
         super(MaskedExtremeWeightedCharbonnierLoss, self).__init__()
         self.loss_weight = loss_weight
         self.reduction = reduction
@@ -21,10 +23,6 @@ class MaskedExtremeWeightedCharbonnierLoss(nn.Module):
         self.extreme_threshold = extreme_threshold
         self.extreme_weight = extreme_weight
         self.under_weight = under_weight
-        
-        self.wet_weight = wet_weight
-        self.wet_threshold = wet_threshold
-        self.wet_scale = wet_scale
 
     def forward(self, pred, target, **kwargs):
         # 1. Base Charbonnier Loss (eps squared for 0.0 ocean safety)
@@ -44,19 +42,9 @@ class MaskedExtremeWeightedCharbonnierLoss(nn.Module):
             under_mask = (pred < target).float()
             weight_map = weight_map * (1.0 + (self.under_weight - 1.0) * under_mask)
         
-        weighted_loss = base_loss * weight_map
+        total_loss = base_loss * weight_map
         
-        # 4. Soft Wet-Day BCE (Stable version with logits)
-        if self.wet_weight > 0.0:
-            pred_logits = (pred - self.wet_threshold) / self.wet_scale
-            tgt_logits  = (target - self.wet_threshold) / self.wet_scale
-            gt_wet = torch.sigmoid(tgt_logits).detach()
-            occ_loss = F.binary_cross_entropy_with_logits(pred_logits, gt_wet, reduction='none')
-            total_loss = weighted_loss + (self.wet_weight * occ_loss)
-        else:
-            total_loss = weighted_loss
-
-        # 5. Built-in Reduction
+        # 4. Built-in Reduction
         if self.reduction == 'sum':
             return self.loss_weight * total_loss.sum()
         elif self.reduction == 'mean':
