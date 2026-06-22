@@ -1079,8 +1079,10 @@ class ClimateUformerMultiScaleHGTMultiScaleOut(nn.Module):
         # _assert_finite('out2_pre_interp', out2)
         #Decoder
         B, L, C = conv2.shape
-        H2 = int(math.sqrt(L))
-        W2 = int(math.sqrt(L))
+        # H2 = int(math.sqrt(L))
+        # W2 = int(math.sqrt(L))
+        H2 = W2 = int(math.sqrt(L))
+        assert H2 * H2 == L, f"Non-square token count L={L}"
         out0 = self.scale0_outconv(conv2.transpose(1, 2).reshape(B, C, H2, W2))
         _assert_finite('out0_pre_interp', out0)
         

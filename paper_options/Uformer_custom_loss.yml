@@ -141,13 +141,15 @@ train:
   pixel_opt:
     type: MaskedExtremeWeightedCharbonnierLoss
     loss_weight: 10
-    reduction: sum            # norm_factor division is applied in optimize_parameters
+    reduction: sum
     eps: !!float 1e-3
-    extreme_threshold: 2.773  # >20 mm/day in CHIRPS log-z-score space
-    extreme_weight: 5.0       # at exactly the threshold, multiplier = 5.0x (not ~15x)
-    wet_weight: 0.0           # 0.0 = disabled; set 0.5 to add occurrence BCE term
-    wet_threshold: -0.9       # z-score of log1p(0) for CHIRPS (compute from stat pkl)
-    wet_scale: 0.3            # sigmoid temperature for soft wet-day boundary
+    extreme_threshold: 2.773   # >20 mm/day
+    extreme_weight: 5.0        # saturates at 2×threshold (~289 mm/day)
+    low_threshold: 0.88        # <2.5 mm/day (wet-day boundary, Chandel P10)
+    low_weight: 2.0            # Chandel r1 — penalise false-rain predictions
+    wet_weight: 0.0
+    wet_threshold: -0.4414     # log1p(0mm) z-scored (was wrongly -0.9)
+    wet_scale: 0.3
 
   # ── MULTISCALE AUXILIARY LOSS ─────────────────────────────────────────────
   # FIX: ClimateUformerMultiScaleHGTMultiScaleOut returns 4 outputs:
@@ -164,8 +166,10 @@ train:
     eps: !!float 1e-3
     extreme_threshold: 2.773
     extreme_weight: 5.0
+    low_threshold: 0.88
+    low_weight: 2.0
     wet_weight: 0.0
-    wet_threshold: -0.9
+    wet_threshold: -0.4414
     wet_scale: 0.3
 
   # ── OPTIONAL SSIM LOSS ────────────────────────────────────────────────────
