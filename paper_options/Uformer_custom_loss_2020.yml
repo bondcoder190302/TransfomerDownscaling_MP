@@ -38,6 +38,8 @@ datasets:
     fix_file_name: 'HGT_fix.npy'
     lsm_lr_path: './DownScale_Paper/LSM_fix/india_lsm_LR.npy'
     lsm_hr_path: './DownScale_Paper/LSM_fix/india_lsm_HR.npy'
+    p90_hr_path: './DownScale_Paper/percentile_maps/p90_hr_z.npy'
+    p10_hr_path: './DownScale_Paper/percentile_maps/p10_hr_z.npy'
     seq_length: 1
     seq_interval: 1
  
@@ -149,14 +151,13 @@ train:
     loss_weight: 10
     reduction: sum
     eps: !!float 1e-3
-    extreme_threshold: 3.1916   # z-score of wet-day P90 ≈ 30.2 mm/day
-    extreme_weight: 1.5         # Chandel r2; weight saturates here
-    under_weight: 1.5           # asymmetric under-prediction penalty
-    low_threshold: -0.4414      # z-score of 0 mm/day (DISABLED — low_weight=1.0)
-    low_weight: 1.0             # 1.0 disables lower-tail branch
-    wet_weight: 0.5             # BCE occurrence term weight; reduce to 0.2 if unstable
-    wet_threshold: -0.4414      # z-score of 0 mm/day (wet/dry boundary)
-    wet_scale: 0.3              # sigmoid temperature: sharp but smooth boundary
+    extreme_weight: 1.5      # Chandel r2 (applied where target > local P90)
+    under_weight: 1.5        # asymmetric dry-bias penalty (kept from v2)
+    low_weight: 1.0          # Chandel r1; 1.0 = lower tail off (start here)
+    wet_weight: 0.5
+    wet_threshold: -0.4414
+    wet_scale: 0.3
+    # extreme_threshold / low_threshold unused when p90/p10 maps are provided              # sigmoid temperature: sharp but smooth boundary
  
   # ── MULTISCALE AUXILIARY LOSS ──────────────────────────────────────────────
   # Supervises the 3 intermediate decoder outputs (out0, out1, out2).
@@ -166,10 +167,8 @@ train:
     loss_weight: 5
     reduction: sum
     eps: !!float 1e-3
-    extreme_threshold: 3.1916
     extreme_weight: 1.5
     under_weight: 1.5
-    low_threshold: -0.4414
     low_weight: 1.0
     wet_weight: 0.5
     wet_threshold: -0.4414

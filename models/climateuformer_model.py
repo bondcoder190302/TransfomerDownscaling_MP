@@ -161,11 +161,6 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
 
         self.output = self.output[0][..., :h*scale, :w*scale]
 
-    # def feed_data(self, data):
-    #     super().feed_data(data)
-    #     if 'lsm_lr' in data and 'lsm_hr' in data:
-    #         self.lsm_lr = data['lsm_lr'].to(self.device)
-    #         self.lsm_hr = data['lsm_hr'].to(self.device)
     def feed_data(self, data):
         super().feed_data(data)
         if 'lsm_hr' in data:
@@ -173,6 +168,11 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             self.lsm_hr = data['lsm_hr'].to(self.device).unsqueeze(1)
         if 'lsm_lr' in data:
             self.lsm_lr = data['lsm_lr'].to(self.device).unsqueeze(1)
+        # Per-pixel percentile threshold maps (B,1,H,W), cropped to match gt.
+        if 'p90_hr' in data:
+            self.p90_hr = data['p90_hr'].to(self.device).unsqueeze(1)
+        if 'p10_hr' in data:
+            self.p10_hr = data['p10_hr'].to(self.device).unsqueeze(1)
 
     def optimize_parameters(self, current_iter):
         logger = get_root_logger()
@@ -243,8 +243,15 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
         l_total = torch.tensor(0.0, device=self.device)
         loss_dict = OrderedDict()
         # pixel loss
+        # per-pixel P90/P10 thresholds for the loss (empty -> scalar fallback)
+        _pctl = {}
+        if hasattr(self, 'p90_hr'):
+            _pctl['p90'] = self.p90_hr
+        if hasattr(self, 'p10_hr'):
+            _pctl['p10'] = self.p10_hr
+
         if self.cri_pix:
-            l_pix = self.cri_pix(self.output[0], gt_lsm)
+            l_pix = self.cri_pix(self.output[0], gt_lsm, **_pctl)
             if not torch.isfinite(l_pix):
                 _skip('non-finite l_pix')
                 return
@@ -256,9 +263,9 @@ class ClimateUformerMultiscaleFuseModel(ClimateSRAddHGTModel):
             # ClimateUformerMultiScaleHGTMultiScaleOut returns 4 outputs:
             # (out, out0, out1, out2). out0/out1/out2 are already upsampled to
             # the final spatial size before fusing, so compare all against self.gt.
-            l_pix_0 = self.cri_pix_multiscale(self.output[1], gt_lsm)
-            l_pix_1 = self.cri_pix_multiscale(self.output[2], gt_lsm)
-            l_pix_2 = self.cri_pix_multiscale(self.output[3], gt_lsm)
+            l_pix_0 = self.cri_pix_multiscale(self.output[1], gt_lsm, **_pctl)
+            l_pix_1 = self.cri_pix_multiscale(self.output[2], gt_lsm, **_pctl)
+            l_pix_2 = self.cri_pix_multiscale(self.output[3], gt_lsm, **_pctl)
             l_pix_multi = l_pix_0 + l_pix_1 + l_pix_2
             if not torch.isfinite(l_pix_multi):
                 _skip('non-finite l_pix_multi')
