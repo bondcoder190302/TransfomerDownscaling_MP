@@ -138,7 +138,7 @@ network_g:
 path:
   pretrain_network_g: ~
   strict_load_g: true
-  resume_state: ~
+  resume_state: ./experiments/Uformer_2015_2020_v2_asymloss/training_states/13155.state
 
 # ── TRAINING ──────────────────────────────────────────────────────────────────
 train:
@@ -154,7 +154,7 @@ train:
     milestones: [13155, 19732, 22363, 24994]
     gamma: 0.5
 
-  total_iter: 13155 #26310
+  total_iter: 26310 #13155
   warmup_iter: -1
 
   # ── PRIMARY PIXEL LOSS ────────────────────────────────────────────────────

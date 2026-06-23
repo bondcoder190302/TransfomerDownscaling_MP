@@ -94,13 +94,13 @@ datasets:
     gt_size: 128
     prefetch_mode: ~
 
-  val:
-    seq_interval: 1
-    train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
-
-  # test:
+  # val:
   #   seq_interval: 1
-  #   train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
+  #   train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
+
+  test:
+    seq_interval: 1
+    train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
 
 # ── NETWORK ───────────────────────────────────────────────────────────────────
 network_g:
@@ -136,7 +136,7 @@ network_g:
 #    resume_state: ~
 #
 path:
-  pretrain_network_g: ~
+  pretrain_network_g: ./experiments/Uformer_2015_2020_v2_asymloss/models/net_g_latest.pth
   strict_load_g: true
   resume_state: ~
 
