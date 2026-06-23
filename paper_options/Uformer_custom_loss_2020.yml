@@ -1,26 +1,61 @@
-# Configuration for precipitation downscaling.
-# Years: 2020 only (smoke-test / ablation run)
-# Study region: India ([62.30, 1.30, 100.70, 39.70])
-# Input : MSWEP precipitation at 0.1° (384x384)
-#         ERA5 Land daily Wind speed/u/v at 0.1° (384x384)
-# Target: CHIRPS daily precipitation at 0.05° (768x768)
-# Auxiliary: Copernicus GLO-90 DEM elevation (768x768, static)
-#            India Land-Sea Mask HR (768x768), LR (384x384), both static
-# Scale factor: 2× (0.1° → 0.05°)
-# Data split (2020): TRAIN=292, VAL=37, TEST=37
- 
-name: Uformer_2020_v2_asymloss
+# ══════════════════════════════════════════════════════════════════════════════
+# MASTER CONFIGURATION — Precipitation Downscaling (2020 ablation / smoke-test)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Study region : India [62.30°E–100.70°E, 1.30°N–39.70°N]
+# Input        : MSWEP precip 0.1° + ERA5 wind (speed/u/v) 0.1°
+# Target       : CHIRPS daily precip 0.05°
+# Auxiliary    : Copernicus GLO-90 DEM 0.05° (static), HR + LR land-sea masks
+# Scale factor : 2× (0.1° → 0.05°)
+# Data split   : TRAIN=292, VAL=37, TEST=37  (2020 only)
+#
+# ── HOW TO SWITCH BETWEEN EXPERIMENT VERSIONS ────────────────────────────────
+#
+#  v2  AsymLoss  (global P90 threshold + asymmetric under-prediction penalty)
+#        • Comment out   the two p90/p10 lines under datasets: common:
+#        • Uncomment     extreme_threshold in BOTH pixel_opt blocks
+#        • Set name      Uformer_2020_v2_asymloss
+#
+#  v3  Perc      (per-pixel P90/P10 maps + asymmetric under-prediction penalty)
+#        • Uncomment     the two p90/p10 lines under datasets: common:
+#        • Comment out   extreme_threshold in BOTH pixel_opt blocks
+#        • Set name      Uformer_2020_v3_perc
+#
+#  v4  SSIM      (v2 or v3 base + SSIM structural loss)
+#        • Apply v2 OR v3 changes above
+#        • Uncomment     the three lines under ssim_opt
+#        • Comment out   the ssim_opt: ~ line
+#        • Set name      Uformer_2020_v4_ssim   (or v3_ssim, etc.)
+#
+#  under_weight  (asymmetric dry-bias penalty — currently ON at 1.5)
+#        • Set under_weight: 1.0 to DISABLE it (plain symmetric Charbonnier)
+#        • Raise to 2.0 if bias is still strongly negative after a run
+#        • Lower to 1.2 if bias flips positive (wet bias)
+#
+#  wet_weight    (soft BCE wet/dry occurrence term — currently ON at 0.5)
+#        • Set wet_weight: 0.0 to DISABLE it
+#        • Reduce to 0.2 if training shows NaN or loss spikes early on
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── CHANGE THIS FOR EACH EXPERIMENT ──────────────────────────────────────────
+# v2:  Uformer_2020_v2_asymloss
+# v3:  Uformer_2020_v3_perc
+# v4:  Uformer_2020_v4_ssim
+name: Uformer_2020_v4_ssim        # ← CHANGE PER EXPERIMENT
+# ─────────────────────────────────────────────────────────────────────────────
+
 model_type: ClimateUformerMultiscaleFuseModel
 scale: 2
 num_gpu: 2
 manual_seed: 0
 fp16: false
- 
+
 anomaly_detection: false
 finite_debug: false
 freeze_layernorm: false
 ln_freeze_iters: 0
- 
+
 # ── DATASETS ──────────────────────────────────────────────────────────────────
 datasets:
   common:
@@ -38,11 +73,17 @@ datasets:
     fix_file_name: 'HGT_fix.npy'
     lsm_lr_path: './DownScale_Paper/LSM_fix/india_lsm_LR.npy'
     lsm_hr_path: './DownScale_Paper/LSM_fix/india_lsm_HR.npy'
-    p90_hr_path: './DownScale_Paper/percentile_maps/p90_hr_z.npy'
-    p10_hr_path: './DownScale_Paper/percentile_maps/p10_hr_z.npy'
+
+    # ── v3 ONLY: per-pixel percentile maps ──────────────────────────────────
+    # UNCOMMENT both lines below for v3 (per-pixel P90/P10).
+    # COMMENT OUT both lines below for v2 (global threshold).
+    # p90_hr_path: './DownScale_Paper/percentile_maps/p90_hr_z.npy'
+    # p10_hr_path: './DownScale_Paper/percentile_maps/p10_hr_z.npy'
+    # ────────────────────────────────────────────────────────────────────────
+
     seq_length: 1
     seq_interval: 1
- 
+
   train:
     train_file: ./DownScale_Paper/DownScale_Correction_split/train_12_36.txt
     use_shuffle: true
@@ -52,22 +93,23 @@ datasets:
     randomcrop: true
     gt_size: 128
     prefetch_mode: ~
- 
+
   val:
     seq_interval: 1
     train_file: ./DownScale_Paper/DownScale_Correction_split/val_12_36.txt
-  # test:
-  #  seq_interval: 1
-  #  train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
 
-# network structures
+  # test:
+  #   seq_interval: 1
+  #   train_file: ./DownScale_Paper/DownScale_Correction_split/test_12_36.txt
+
+# ── NETWORK ───────────────────────────────────────────────────────────────────
 network_g:
   type: ClimateUformerMultiScaleHGTMultiScaleOut
   add_hgt: true
   upscale: 2
-  num_in_ch: 4 # MSWEP precipitation + ERA5 10 m wind speed/u/v
-  num_out_ch: 1 # CHIRPS precipitation (1 channel)
-  img_size: 64 # LR input spatial size (gt_size / scale = 128 / 2)
+  num_in_ch: 4
+  num_out_ch: 1
+  img_size: 64
   window_size: 16
   depths: [2, 2, 2, 2, 2]
   embed_dim: 128
@@ -79,25 +121,24 @@ network_g:
   multi_add_pos: 'xcoder'
   drop_path_rate: 0.0
 
-# ── PATH CONFIGURATIONS & RUNTIME MODES ───────────────────────────────────────
+# ── PATH CONFIGURATION ────────────────────────────────────────────────────────
+#
+#  MODE A — Fresh training start (default, both lines stay ~)
+#    pretrain_network_g: ~
+#    resume_state: ~
+#
+#  MODE B — Resume an interrupted run
+#    pretrain_network_g: ~
+#    resume_state: ./experiments/<name>/training_states/<iter>.state
+#
+#  MODE C — Test / inference only
+#    pretrain_network_g: ./experiments/<name>/models/net_g_latest.pth
+#    resume_state: ~
+#
 path:
-  # ────────────────────────────────────────────────────────────────────────────
-  # MODE A: Fresh Training Start  ← ACTIVE for this smoke test
-  #   - pretrain_network_g: ~
-  #   - resume_state: ~
-  #
-  # MODE B: Resuming an Interrupted Run (Stage 1 to Stage 2 Chaining)
-  #   - pretrain_network_g: ~
-  #   - resume_state: [path to your saved .state file, e.g., 730.state]
-  #
-  # MODE C: Testing / Inference Mode (Using a fully trained model)
-  #   - pretrain_network_g: [path to your best weights file, e.g., net_g_latest.pth]
-  #   - resume_state: ~
-  # ────────────────────────────────────────────────────────────────────────────
-
-  pretrain_network_g: ~ #./experiments/Uformer_2020_v2_asymloss/models/net_g_latest.pth
+  pretrain_network_g: ~
   strict_load_g: true
-  resume_state: ~ #./experiments/Uformer_2020_v2_asymloss/training_states/13155.state
+  resume_state: ~
 
 # ── TRAINING ──────────────────────────────────────────────────────────────────
 train:
@@ -106,87 +147,109 @@ train:
     lr: !!float 2e-4
     betas: [0.9, 0.95]
     eps: !!float 1e-6
- 
+
   scheduler:
     type: MultiStepLR
-    # Drop LR at 50%, 75%, 85%, 95% of total iterations
+    # LR drops at 50%, 75%, 85%, 95% of total iterations
     milestones: [730, 1095, 1241, 1387]
     gamma: 0.5
- 
-  total_iter: 1460   # ~5 epochs on 2020 data
+
+  total_iter: 1460    # 10 epochs on 2020 training data (146 iters/epoch)
   warmup_iter: -1
- 
-  # ── PRIMARY PIXEL LOSS ──────────────────────────────────────────────────────
+
+  # ── PRIMARY PIXEL LOSS ────────────────────────────────────────────────────
   #
-  # Threshold values (all in log1p + z-score space):
-  #   CHIRPS stats: mean=0.4180, std=0.9470
+  # CHIRPS log1p z-score stats: mean=0.4180, std=0.9470, max=6.5211
   #
-  #   extreme_threshold = 3.1916
-  #     → wet-day P90 computed from 2192 days × India land pixels
-  #     → physical value ≈ 30.2 mm/day (heavy monsoon rain)
-  #     → formula: (log1p(30.2) - 0.4180) / 0.9470
+  # extreme_threshold
+  #   → USED ONLY IN v2 (global scalar fallback).
+  #   → IGNORED in v3 because per-pixel p90 maps override it.
+  #   → Value 3.1916 = z-score of wet-day P90 ≈ 30.2 mm/day
+  #     formula: (log1p(30.2) - 0.4180) / 0.9470
   #
-  #   wet_threshold = -0.4414
-  #     → z-score of exactly 0 mm/day
-  #     → formula: (log1p(0.0) - 0.4180) / 0.9470
-  #     → ocean pixels are forced to z=0.0 by LSM; real dry land pixels sit
-  #       at z=-0.4414; so this boundary is at the true dry-day edge.
-  #
-  #   low_threshold = -0.4414, low_weight = 1.0
-  #     → DISABLED (code skips this branch when low_weight == 1.0)
-  #     → kept for documentation; remove or set low_weight > 1.0 to enable
+  # extreme_weight = 1.5  (Chandel r2)
+  #   → Loss multiplier applied where target > P90 (global or per-pixel).
   #
   # under_weight = 1.5
-  #   → Multiplies the Charbonnier weight by 1.5 when pred < target.
-  #   → Addresses the confirmed dry bias (log-space: -0.18, heavy-day: -20 mm).
-  #   → Effect: extreme under-predicted pixel gets weight = extreme_weight * under_weight = 2.25×
-  #   → If validation bias flips positive (wet bias), reduce to 1.2–1.3.
+  #   → Multiplies loss by 1.5 wherever pred < target (under-prediction).
+  #   → Directly addresses the dry bias confirmed in diagnostics.
+  #   → Set to 1.0 to DISABLE. Raise to 2.0 if bias still very negative.
+  #   → Lower to 1.2 if validation bias flips positive (wet bias).
   #
   # wet_weight = 0.5
-  #   → Enables the soft BCE occurrence term (wet/dry spatial accuracy).
-  #   → If training loss becomes unstable (NaN / large spikes), reduce to 0.2.
+  #   → Soft BCE term for wet/dry spatial accuracy.
+  #   → Set to 0.0 to DISABLE. Reduce to 0.2 if training is unstable.
+  #
+  # wet_threshold = -0.4414
+  #   → z-score of 0 mm/day: (log1p(0.0) - 0.4180) / 0.9470
+  #   → Do NOT change this value.
   #
   pixel_opt:
     type: MaskedExtremeWeightedCharbonnierLoss
     loss_weight: 10
     reduction: sum
     eps: !!float 1e-3
-    extreme_weight: 1.5      # Chandel r2 (applied where target > local P90)
-    under_weight: 1.5        # asymmetric dry-bias penalty (kept from v2)
-    low_weight: 1.0          # Chandel r1; 1.0 = lower tail off (start here)
-    wet_weight: 0.5
+
+    # ── v2 ONLY: global threshold ──────────────────────────────────────────
+    # UNCOMMENT for v2. COMMENT OUT for v3 (per-pixel maps make this unused,
+    # but leaving it in is harmless — it just won't be read by the loss).
+    extreme_threshold: 3.1916    # ← UNCOMMENT for v2 / can leave for v3 (ignored)
+    # ──────────────────────────────────────────────────────────────────────
+
+    extreme_weight: 1.5
+    under_weight: 1.5            # set 1.0 to disable, 2.0 to push harder
+    low_weight: 1.0              # 1.0 = lower-tail branch disabled
+    wet_weight: 0.5              # set 0.0 to disable BCE term
     wet_threshold: -0.4414
     wet_scale: 0.3
-    # extreme_threshold / low_threshold unused when p90/p10 maps are provided              # sigmoid temperature: sharp but smooth boundary
- 
-  # ── MULTISCALE AUXILIARY LOSS ──────────────────────────────────────────────
-  # Supervises the 3 intermediate decoder outputs (out0, out1, out2).
-  # Identical type/params but half the loss_weight of the primary loss.
+
+  # ── MULTISCALE AUXILIARY LOSS ─────────────────────────────────────────────
+  # Supervises the 3 intermediate decoder outputs.
+  # Keep identical to pixel_opt but with loss_weight: 5 (half of primary).
   pixel_multiscale_opt:
     type: MaskedExtremeWeightedCharbonnierLoss
     loss_weight: 5
     reduction: sum
     eps: !!float 1e-3
+
+    # ── v2 ONLY: global threshold (mirror of pixel_opt above) ─────────────
+    extreme_threshold: 3.1916    # ← UNCOMMENT for v2 / can leave for v3 (ignored)
+    # ──────────────────────────────────────────────────────────────────────
+
     extreme_weight: 1.5
     under_weight: 1.5
     low_weight: 1.0
     wet_weight: 0.5
     wet_threshold: -0.4414
     wet_scale: 0.3
- 
-  # ── SSIM LOSS ─────────────────────────────────────────────────────────────
-  ssim_opt: ~   # disabled; enable only after verifying loss stability above
-    # type: ClimateSSIMLoss
-    # loss_weight: 1
-    # data_range: 6.5211 
+
+  # ── OPTIONAL SSIM LOSS ────────────────────────────────────────────────────
+  # Adds spatial-structure supervision to fix missed rain clusters.
+  # Works on top of v2 OR v3 — independent of the threshold choice above.
+  #
+  # TO ENABLE (v4):
+  #   1. Comment out the   ssim_opt: ~   line below
+  #   2. Uncomment the three lines under it (type / loss_weight / data_range)
+  #   3. Change the experiment name at the top to Uformer_2020_v4_ssim
+  #
+  # loss_weight: 1  is intentionally small (pixel_opt is 10).
+  #   SSIM guides WHERE rain appears; Charbonnier controls HOW MUCH.
+  #   Raise to 2 if missed clusters still appear. Lower to 0.5 if bias worsens.
+  #
+  # ssim_opt: ~                    # ← COMMENT THIS OUT to enable SSIM
+  ssim_opt:                    # ← UNCOMMENT these three lines to enable SSIM
+    type: ClimateSSIMLoss
+    loss_weight: 1
+    data_range: 6.5211
+
 # ── VALIDATION ────────────────────────────────────────────────────────────────
 val:
-  val_freq: 146   # validate once per epoch
+  val_freq: 146
   save_img: false
   save_npy: true
   save_npy_onlyoutput: true
   pbar: true
- 
+
   metrics:
     psnr:
       type: calculate_climate_psnr
@@ -206,13 +269,13 @@ val:
       type: calculate_climate_mae
       crop_border: 0
       better: lower
- 
+
 # ── LOGGING ───────────────────────────────────────────────────────────────────
 logger:
   print_freq: 20
   save_checkpoint_freq: 146
   use_tb_logger: false
- 
+
 # ── DISTRIBUTED TRAINING ──────────────────────────────────────────────────────
 dist_params:
   backend: nccl
