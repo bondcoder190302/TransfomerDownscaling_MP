@@ -4,9 +4,6 @@ Estimating high-resolution (1–4 km) daily precipitation over India using space
 
 ## Overview
 
-**Thesis Title:** *Estimating High-Resolution (1-4 km) Daily Precipitation with Space/Time Deep Learning*
-
-**Degree:** M.Tech (CSRE, IIT Bombay) | **Candidate:** Vipul Tiwari (Roll: 24M0306) | **Advisor:** Prof. Karthikeyan Lanka
 
 ### Core Contribution
 
