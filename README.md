@@ -1,281 +1,448 @@
-# :rocket: BasicSR Examples
+# TransformerDownscaling_MP: Transformer-Based Statistical Downscaling for Precipitation
 
-[![download](https://img.shields.io/github/downloads/xinntao/BasicSR-examples/total.svg)](https://github.com/xinntao/BasicSR-examples/releases)
-[![Open issue](https://img.shields.io/github/issues/xinntao/BasicSR-examples)](https://github.com/xinntao/BasicSR-examples/issues)
-[![Closed issue](https://img.shields.io/github/issues-closed/xinntao/BasicSR-examples)](https://github.com/xinntao/BasicSR-examples/issues)
-[![LICENSE](https://img.shields.io/github/license/xinntao/basicsr-examples.svg)](https://github.com/xinntao/BasicSR-examples/blob/master/LICENSE)
-[![python lint](https://github.com/xinntao/BasicSR/actions/workflows/pylint.yml/badge.svg)](https://github.com/xinntao/BasicSR/blob/master/.github/workflows/pylint.yml)
+Estimating high-resolution (1–4 km) daily precipitation over India using space/time deep learning. This repository implements a **2× statistical downscaling** framework transforming coarse-resolution precipitation (MSWEP 0.1°) to fine-resolution targets (CHIRPS 0.05°), conditioned on wind fields and topography.
 
-[English](README.md) **|** [简体中文](README_CN.md) <br>
-[`BasicSR repo`](https://github.com/xinntao/BasicSR) **|** [`simple mode example`](https://github.com/xinntao/BasicSR-examples/tree/master) **|** [`installation mode example`](https://github.com/xinntao/BasicSR-examples/tree/installation)
+## Overview
 
-In this repository, we give examples to illustrate **how to easily use** [`BasicSR`](https://github.com/xinntao/BasicSR) in **your own project**.
+**Thesis Title:** *Estimating High-Resolution (1-4 km) Daily Precipitation with Space/Time Deep Learning*
 
-:triangular_flag_on_post: **Projects that use BasicSR**
-- :white_check_mark: [**GFPGAN**](https://github.com/TencentARC/GFPGAN): A practical algorithm for real-world face restoration
-- :white_check_mark: [**Real-ESRGAN**](https://github.com/xinntao/Real-ESRGAN): A practical algorithm for general image restoration
+**Degree:** M.Tech (CSRE, IIT Bombay) | **Candidate:** Vipul Tiwari (Roll: 24M0306) | **Advisor:** Prof. Karthikeyan Lanka
 
-If you use `BasicSR` in your open-source projects, welcome to contact me (by [email](#e-mail-contact) or opening an issue/pull request). I will add your projects to the above list :blush:
+### Core Contribution
 
----
+This work develops **ClimateUformerMultiscaleFuseModel**, a transformer-based architecture (fork of Zhong et al. 2024, QJRMS) that addresses the systematic dry bias in precipitation downscaling through:
 
-If this repo is helpful, please help to :star: this repo or recommend it to your friends. Thanks:blush: <br>
-Other recommended projects:<br>
-:arrow_forward: [facexlib](https://github.com/xinntao/facexlib): A collection that provides useful face-relation functions.<br>
-:arrow_forward: [HandyView](https://github.com/xinntao/HandyView): A PyQt5-based image viewer that is handy for view and comparison.
+- **Asymmetric loss function (AsymLoss v2)** with extreme-event weighting and under-prediction penalties
+- **Multi-scale deep supervision** with pixel-shuffle upsampling
+- **Topography fusion branch** encoding SRTM elevation as a conditioning signal
+- **Windowed self-attention** (LeWin blocks, window 16×16) for computational efficiency
+
+**Key Result:** Reduces systematic dry bias by ~23% and extends maximum predicted precipitation from ~66 mm/day (Charbonnier baseline) to ~204 mm/day.
 
 ---
 
-## Contents
+## Data & Architecture
 
-- [HowTO use BasicSR](#HowTO-use-BasicSR)
-- [As s Template](#As-a-Template)
+### Input Data
 
-## HowTO use BasicSR
+| Dataset | Resolution | Role | Coverage |
+|---------|-----------|------|----------|
+| **MSWEP** | 0.1° (~10 km) | Low-resolution precipitation input | Global daily 2015–2020 |
+| **CHIRPS** | 0.05° (~5 km) | High-resolution target (labels) | India-focused 2015–2020 |
+| **ERA5-Land** | 0.1° (~11 km) | Wind conditioning (u, v components) | Global 2015–2020 |
+| **SRTM** (USGS SRTMGL1_003) | ~30 m | Elevation/topography branch | India coverage |
 
-`BasicSR` can be used in two ways:
-- :arrow_right: Git clone the entire BasicSR. In this way, you can see the complete codes of BasicSR, and then modify them according to your own needs.
-- :arrow_right: Use basicsr as a [python package](https://pypi.org/project/basicsr/#history) (that is, install with pip). It provides the training framework, procedures, and some basic functions. You can easily build your own projects based on basicsr.
-    ```bash
-    pip install basicsr
-    ```
+### Model Architecture
 
-Our example mainly focuses on the second one, that is, how to easily and concisely build your own project based on the basicsr package.
-
-There are two ways to use the python package of basicsr, which are provided in two branches:
-
-- :arrow_right: [simple mode](https://github.com/xinntao/BasicSR-examples/tree/master): the project can be run **without installation**. But it has limitations: it is inconvenient to import complex hierarchical relationships; It is not easy to access the functions in this project from other locations
-
-- :arrow_right: [installation mode](https://github.com/xinntao/BasicSR-examples/tree/installation): you need to install the project by running `python setup.py develop`. After installation, it is more convenient to import and use.
-
-As a simple introduction and explanation, we use the example of *simple mode*, but we recommend the *installation mode* in practical use.
-
-```bash
-git clone https://github.com/xinntao/BasicSR-examples.git
-cd BasicSR-examples
+```
+Input (LR): MSWEP 64×64 patches @ 0.1° + ERA5-Land winds
+         ↓
+    LeWin Transformer Blocks (windowed self-attention)
+         ↓
+    Multi-scale Deep Supervision + Pixel-Shuffle Upsampling
+         ↓
+    Topography Fusion Branch (SRTM conditioning)
+         ↓
+Output (HR): Downsampled CHIRPS 128×128 patches @ 0.05°
 ```
 
-### Preliminary
+**Architecture Details:**
+- Windowed self-attention window size: 16×16
+- Upsampling: pixel-shuffle (2×)
+- Loss: v2 AsymLoss (Charbonnier base + extreme-event weighting + asymmetric penalty + soft BCE occurrence term)
+- Training data normalization: log₁ₚ + z-score (computed over land pixels only)
+- Land-sea masking: applied at both LR (0.1°) and HR (0.05°) resolutions
 
-Most deep-learning projects can be divided into the following parts:
+---
 
-1. **data**: defines the training/validation data that is fed into the model training
-2. **arch** (architecture): defines the network structure and the forward steps
-3. **model**: defines the necessary components in training (such as loss) and a complete training process (including forward propagation, back-propagation, gradient optimization, *etc*.), as well as other functions, such as validation, *etc*
-4. Training pipeline: defines the training process, that is, connect the data-loader, model, validation, saving checkpoints, *etc*
+## Setup & Installation
 
-When we are developing a new method, we often improve the **data**, **arch**, and **model**. Most training processes and basic functions are actually shared. Then, we hope to focus on the development of main functions instead of building wheels repeatedly.
+### Environment Requirements
 
-Therefore, we have BasicSR, which separates many shared functions. With BasicSR, we just need to care about the development of **data**, **arch**, and **model**.
+- **Python:** 3.9–3.11
+- **CUDA:** 11.8+ (recommended for GPU training)
+- **PyTorch:** 2.0+
+- **Training Platform:** Kaggle (2× GPU sessions, 30-hour kernel timeout)
 
-In order to further facilitate the use of BasicSR, we provide the basicsr package. You can easily install it through `pip install basicsr`. After that, you can use the training process of BasicSR and the functions already developed in BasicSR~
-
-### A Simple Example
-
-Let's use a simple example to illustrate how to use BasicSR to build your own project.
-
-We provide two sample data for demonstration:
-1. [BSDS100](https://github.com/xinntao/BasicSR-examples/releases/download/0.0.0/BSDS100.zip) for training
-1. [Set5](https://github.com/xinntao/BasicSR-examples/releases/download/0.0.0/Set5.zip) for validation
-
-You can easily download them by running the following command in the BasicSR-examples root path:
+### 1. Clone & Install Dependencies
 
 ```bash
-python scripts/prepare_example_data.py
+git clone https://github.com/your-org/TransformerDownscaling_MP.git
+cd TransformerDownscaling_MP
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install core dependencies
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
 ```
 
-The sample data are now in the `datasets/example` folder.
+### 2. Install BasicSR Framework
 
-#### :zero: Purpose
+This repo builds on **BasicSR** (registration-based framework for image restoration):
 
-Let's use a Super-Resolution task for the demo.
-It takes a low-resolution image as the input and outputs a high-resolution image.
-The low-resolution images contain: 1) CV2 bicubic X4 downsampling, and 2) JPEG compression (quality = 70).
+```bash
+cd basicsr
+pip install -e .
+cd ..
+```
 
-In order to better explain how to use the arch and model, we use 1) a network structure similar to SRCNN; 2) use L1 and L2 (MSE) loss simultaneously in training.
+Key BasicSR components:
+- **Registry pattern:** Models, losses, and data loaders registered via decorators
+- **Distributed training:** DistributedDataParallel wrapper for multi-GPU setups
+- **Logger integration:** Tensorboard, wandb, and local file logging
 
-So, in this task, what we should do are:
+### 3. Data Preparation
 
-1. Build our own data loader
-1. Determine the architecture
-1. Build our own model
+#### Directory Structure
 
-Let's explain it separately in the following parts.
+```
+data/
+├── MSWEP/
+│   ├── 2015/
+│   │   ├── MSWEP_2015_*.npy       (daily LR precipitation)
+│   │   └── ...
+│   ├── 2016/
+│   └── ...
+├── CHIRPS/
+│   ├── 2015/
+│   │   ├── CHIRPS_2015_*.npy      (daily HR precipitation targets)
+│   │   └── ...
+│   ├── 2016/
+│   └── ...
+├── ERA5Land_winds/
+│   ├── 2015/
+│   │   ├── ERA5_winds_2015_*.npy  (u, v components 0.1°)
+│   │   └── ...
+│   ├── 2016/
+│   └── ...
+├── SRTM/
+│   └── SRTM_India.npy             (static elevation map, ~30 m resampled to 0.1°)
+├── masks/
+│   ├── land_sea_mask_LR.npy       (0.1° land-sea mask)
+│   └── land_sea_mask_HR.npy       (0.05° land-sea mask)
+└── normalization/
+    ├── chirps_stats_train.npy     (mean, std for HR data, computed 2015–2020)
+    ├── mswep_stats_train.npy      (mean, std for LR data)
+    └── p90_hr.npy                 (P90 threshold for extreme weighting, optional)
+```
 
-#### :one: data
+#### Download & Preprocess Data
 
-We need to implement a new dataset to fulfill our purpose. The dataset is used to feed the data into the model.
+Data preprocessing scripts (regridding, masking, normalization) are in `data_prep/`:
 
-An example of this dataset is in [data/example_dataset.py](data/example_dataset.py). It has the following steps.
+```bash
+cd data_prep
 
-1. Read Ground-Truth (GT) images. BasicSR provides [FileClient](https://github.com/xinntao/BasicSR/blob/master/basicsr/utils/file_client.py) for easily reading files in a folder, LMDB file and meta_info txt. In this example, we use the folder mode. For more reading modes, please refer to [basicsr/data](https://github.com/xinntao/BasicSR/tree/master/basicsr/data)
-1. Synthesize low resolution images. We can directly implement the data procedures in the `__getitem__(self, index)` function, such as downsampling and adding JPEG compression. Many basic operations can be found in [[basicsr/data/degradations]](https://github.com/xinntao/BasicSR/blob/master/basicsr/data/degradations.py), [[basicsr/data/tranforms]](https://github.com/xinntao/BasicSR/blob/master/basicsr/data/transforms.py) ,and [[basicsr/data/data_util]](https://github.com/xinntao/BasicSR/blob/master/basicsr/data/data_util.py)
-1. Convert to torch tensor and return appropriate information
+# Download MSWEP (example; adjust for your region/period)
+python download_mswep.py --start_year 2015 --end_year 2020 --region india --output ../data/MSWEP
 
-**Note**:
+# Download CHIRPS (target)
+python download_chirps.py --start_year 2015 --end_year 2020 --region india --output ../data/CHIRPS
 
-1. Please add `@DATASET_REGISTRY.register()` before `ExampleDataset`. This operation is mainly used to prevent the occurrence of a dataset with the same name, which will result in potential bugs
-1. The new dataset file should end with `_dataset.py`, such as `example_dataset.py`. In this way, the program can **automatically** import classes without manual import
+# Download ERA5-Land winds
+python download_era5_winds.py --start_year 2015 --end_year 2020 --output ../data/ERA5Land_winds
 
-In the [option configuration file](options/example_option.yml), you can use the new dataset:
+# Regrid to common resolution (0.1° LR, 0.05° HR)
+# Note: Uses nearest-neighbour interpolation (see interpolation note below)
+python regrid_all_data.py --resolution_lr 0.1 --resolution_hr 0.05
+
+# Compute normalization statistics (land pixels only)
+python compute_normalization_stats.py --train_years 2015 2016 2017 2018 2019 2020
+
+cd ..
+```
+
+**Interpolation Note:** Historical regridding used nearest-neighbour interpolation. Verify against folder naming and YAML config to confirm method.
+
+#### Create Train/Val/Test Splits
+
+```bash
+python scripts/create_data_splits.py \
+  --data_root ./data \
+  --train_years 2015 2016 2017 2018 2019 \
+  --val_year 2020_jan_to_jun \
+  --test_year 2020_jul_to_dec \
+  --output ./data/train_val_test_lists.txt
+```
+
+Output: `train_val_test_lists.txt` with format:
+```
+/path/to/MSWEP_2015_01_01.npy /path/to/CHIRPS_2015_01_01.npy 2015-01-01
+/path/to/MSWEP_2015_01_02.npy /path/to/CHIRPS_2015_01_02.npy 2015-01-02
+...
+```
+
+**Index Chain Warning:** The RadarDataset class chains indices: `idx → data_map[idx] → basename → strip .npy → date token`. Any preprocessing script consuming train/val lists must mirror this exact resolution.
+
+---
+
+## Training Configuration
+
+### Configuration File Structure
+
+Master training YAML: `configs/Uformer_2020_master.yml`
 
 ```yaml
-datasets:
-  train:  # training dataset
-    name: ExampleBSDS100
-    type: ExampleDataset  # the class name
+# Model architecture
+name: 'ClimateUformerMultiscaleFuseModel'
+type: ClimateUformerMultiscaleModel
+num_in_ch: 2           # MSWEP (LR precip) + ERA5 wind speed (derived from u, v)
+num_out_ch: 1          # CHIRPS (HR precip)
+embed_dim: 96
+depths: [6, 6, 6, 6]
+num_heads: [6, 6, 6, 6]
+window_size: 16
+scale: 2               # 2× upsampling (64→128)
+topography_enabled: true
+srtm_path: './data/SRTM/SRTM_India.npy'
 
-    # ----- the followings are the arguments of ExampleDataset ----- #
-    dataroot_gt: datasets/example/BSDS100
-    io_backend:
-      type: disk
+# Loss function (v2 AsymLoss selected as final)
+loss:
+  type: 'v2_AsymLoss'  # Toggle: 'v2_AsymLoss' | 'v3_PerPixelPercentile' | 'v4_AsymLoss_SSIM'
+  base_loss: 'Charbonnier'
+  epsilon: 1.0e-3
+  weight_ext: 5.0        # Extreme-event weight ramp
+  p90_threshold: 3.1916  # Global P90 threshold
+  weight_asymmetry: 2.0  # Under-prediction penalty (parameter a)
+  weight_wet: 0.1        # Soft BCE occurrence term
 
-    gt_size: 128
-    use_flip: true
-    use_rot: true
+# Training hyperparameters
+num_gpu: 2
+batch_size: 4          # Per GPU; global batch = 8
+num_worker: 4
+total_epochs: 120      # Via dataset_enlarge_ratio: 4 (30 real epochs × 4)
+dataset_enlarge_ratio: 4
+milestone: [20000, 40000]  # Learning rate schedule (steps)
+lr_G: 2.0e-4
 
-    # ----- arguments of data loader ----- #
-    use_shuffle: true
-    num_worker_per_gpu: 3
-    batch_size_per_gpu: 16
-    dataset_enlarge_ratio: 10
-    prefetch_mode: ~
-
-  val:  # validation dataset
-    name: ExampleSet5
-    type: ExampleDataset
-    dataroot_gt: datasets/example/Set5
-    io_backend:
-      type: disk
+# Data loader
+crop_size: 64          # Input crop (LR)
+target_crop_size: 128  # Target crop (HR, 2× input)
+normalization: 'log1p_zscore'  # log₁ₚ + z-score (land pixels only)
+mask_lr: './data/masks/land_sea_mask_LR.npy'
+mask_hr: './data/masks/land_sea_mask_HR.npy'
 ```
 
-#### :two: arch
+### Running Training on Kaggle
 
-An example of architecture is in [archs/example_arch.py](archs/example_arch.py). It mainly builds the network structure.
+Kaggle sessions have a 30-hour kernel timeout. For 6-year training (estimated ~19 hours), use **MODE B split/resume**:
 
-**Note**:
+#### Session 1: Initial Training
+```bash
+# Copy repo and data to Kaggle working directory
+# cd /kaggle/working
 
-1. Add `@ARCH_REGISTRY.register()` before `ExampleArch`, so as to register the newly implemented arch. This operation is mainly used to prevent the occurrence of arch with the same name, resulting in potential bugs
-1. The new arch file should end with `_arch.py`, such as `example_arch.py`. In this way, the program can **automatically** import classes without manual import
-
-In the [option configuration file](options/example_option.yml), you can use the new arch:
-
-```yaml
-# network structures
-network_g:
-  type: ExampleArch  # the class name
-
-  # ----- the followings are the arguments of ExampleArch ----- #
-  num_in_ch: 3
-  num_out_ch: 3
-  num_feat: 64
-  upscale: 4
+# Start training (MODE A: train until kernel timeout)
+python -m torch.distributed.launch \
+  --nproc_per_node=2 \
+  basicsr/train.py \
+  -opt configs/Uformer_2020_master.yml
 ```
 
-#### :three: model
-
-An example of model is in [models/example_model.py](models/example_model.py). It mainly builds the training process of a model.
-
-In this file:
-1. We inherit `SRModel` from basicsr. Many models have similar operations, so you can inherit and modify from [basicsr/models](https://github.com/xinntao/BasicSR/tree/master/basicsr/models). In this way, you can easily implement your ideas, such as GAN model, video model, *etc*.
-1. Two losses are used: L1 and L2 (MSE) loss
-1. Many other contents, such as `setup_optimizers`, `validation`, `save`, *etc*, are inherited from `SRModel`
-
-**Note**:
-
-1. Add `@MODEL_REGISTRY.register()` before `ExampleModel`, so as to register the newly implemented model. This operation is mainly used to prevent the occurrence of model with the same name, resulting in potential bugs
-1. The new model file should end with `_model.py`, such as `example_model.py`. In this way, the program can **automatically** import classes without manual import
-
-In the [option configuration file](options/example_option.yml), you can use the new model:
-
-```yaml
-# training settings
-train:
-  optim_g:
-    type: Adam
-    lr: !!float 2e-4
-    weight_decay: 0
-    betas: [0.9, 0.99]
-
-  scheduler:
-    type: MultiStepLR
-    milestones: [50000]
-    gamma: 0.5
-
-  total_iter: 100000
-  warmup_iter: -1  # no warm up
-
-  # ----- the followings are the configurations for two losses ----- #
-  # losses
-  l1_opt:
-    type: L1Loss
-    loss_weight: 1.0
-    reduction: mean
-
-  l2_opt:
-    type: MSELoss
-    loss_weight: 1.0
-    reduction: mean
+#### Session 2: Resume Training
+```bash
+# MODE B: Resume from checkpoint
+python -m torch.distributed.launch \
+  --nproc_per_node=2 \
+  basicsr/train.py \
+  -opt configs/Uformer_2020_master.yml \
+  --auto_resume
 ```
 
-#### :four: training pipeline
+**Checkpoint Management:**
+- Checkpoints saved to: `experiments/ClimateUformerMultiscaleFuseModel/models/`
+- Latest checkpoint: `latest.pth`
+- Best model (by validation loss): `best.pth`
+- Resume logic: BasicSR auto-detects `latest.pth` and resumes training state (epoch, LR schedule, etc.)
 
-The whole training pipeline can reuse the [basicsr/train.py](https://github.com/xinntao/BasicSR/blob/master/basicsr/train.py) in BasicSR.
+---
 
-Based on this, our [train.py](train.py) can be very concise:
+## Model Variants & Loss Functions
 
-```python
-import os.path as osp
+Three loss variants were compared on 2020 data (ablation study):
 
-import archs  # noqa: F401
-import data  # noqa: F401
-import models  # noqa: F401
-from basicsr.train import train_pipeline
+| Variant | Loss Mechanism | Performance | Notes |
+|---------|----------------|-------------|-------|
+| **v2 AsymLoss** ✓ | Global P90 threshold + asymmetric penalty | Baseline metrics | **Selected for final 6-year training** |
+| v3 Per-Pixel Percentile | Per-pixel P90/P10 thresholds | ~same as v2 | Added complexity without improvement |
+| v4 AsymLoss + SSIM | SSIM regularization | Structural quality gains, lower intensity | Trade-off: nice structure but lower values |
 
-if __name__ == '__main__':
-    root_path = osp.abspath(osp.join(__file__, osp.pardir))
-    train_pipeline(root_path)
+**Selection Rationale:** v2 provides stable, reproducible extreme-event handling with minimal hyperparameter tuning. Per-pixel percentile thresholds (v3) offered no metric improvement. SSIM regularization (v4) trades mean intensity for structural quality—a consistent pattern across configurations.
+
+---
+
+## Evaluation & Results
+
+### Metrics Computed
+
+On held-out test set (2020-07 to 2020-12, 219 days):
+
+- **Spatial Mean Bias:** Mean absolute error in daily spatial mean precipitation
+- **Rainfall Intensity PDF:** Distribution of predicted vs. observed daily rainfall values
+- **Extreme Event Indices:** R95p, R99p (95th/99th percentile rainfall amounts)
+- **Spatial Structure:** Correlation maps, bias maps (mean predicted − mean observed)
+
+### Key Findings
+
+1. **Systematic Dry Bias Reduction:** v2 AsymLoss achieves ~23% reduction in dry bias vs. Charbonnier baseline
+2. **Extended Output Range:** Baseline saturates at ~66 mm/day; v2 AsymLoss reaches ~204 mm/day
+3. **Topography Matters:** SRTM branch improves predictions in orographically complex regions
+4. **Asymmetric Penalty Critical:** Parameter *a* (under-prediction weight) is the key mechanism; global P90 threshold sufficient for this domain
+
+### Figures
+
+- **Figure 5.2:** LeWin Transformer Block Architecture
+- **Figure 6.1:** Asymmetric Loss Weight Distribution
+- **Figure 6.2:** P90 Partitioning (Extreme vs. Non-Extreme)
+- **Figure 7.1:** Experimental Workflow Flowchart
+- **Figure 8.4:** Spatial Comparison (Predicted vs. Observed, Example Day)
+- **Figure 8.5:** Mean Precipitation & Bias Maps (All 219 Test Days)
+- **Figure 8.6:** Rainfall Intensity PDF with R95p/R99p Inset
+
+---
+
+## Project Structure
 
 ```
+TransformerDownscaling_MP/
+├── basicsr/                    # BasicSR framework (core training logic)
+│   ├── archs/
+│   │   └── climateformer_arch.py       # ClimateUformerMultiscaleFuseModel
+│   ├── data/
+│   │   ├── radar_dataset.py            # RadarDataset (train/val/test loader)
+│   │   └── data_util.py
+│   ├── losses/
+│   │   ├── losses.py                   # v2/v3/v4 AsymLoss variants
+│   │   └── ssim_loss.py                # Optional SSIM regularization
+│   ├── models/
+│   │   └── sr_model.py                 # Training loop, backward pass
+│   ├── train.py                        # Entry point (distributed training)
+│   └── registry.py                     # Decorator-based registration
+├── configs/
+│   └── Uformer_2020_master.yml         # Master YAML (v2/v3/v4 toggles)
+├── data_prep/
+│   ├── download_mswep.py
+│   ├── download_chirps.py
+│   ├── download_era5_winds.py
+│   ├── regrid_all_data.py
+│   ├── compute_normalization_stats.py
+│   └── create_data_splits.py
+├── scripts/
+│   ├── inference.py                    # Tile-based inference (high-res regions)
+│   ├── evaluate.py                     # Compute metrics on test set
+│   └── visualize_results.py            # Plot figures
+├── experiments/                        # Training outputs
+│   └── ClimateUformerMultiscaleFuseModel/
+│       ├── models/
+│       │   ├── latest.pth
+│       │   └── best.pth
+│       ├── log/
+│       └── tb_logger/                  # Tensorboard logs
+├── requirements.txt
+└── README.md
+```
 
-#### :five: debug mode
+---
 
-So far, we have completed the development of our project. We can quickly check whether there is a bug through the `debug` mode:
+## Usage (High-Level)
+
+### Training
 
 ```bash
-python train.py -opt options/example_option.yml --debug
+python -m torch.distributed.launch --nproc_per_node=2 basicsr/train.py -opt configs/Uformer_2020_master.yml
 ```
 
-With `--debug`, the program will enter the debug mode. In the debug mode, the program will output at each iteration, and perform validation every 8 iterations, so that you can easily know whether the program has a bug~
-
-#### :six: normal training
-
-After debugging, we can have the normal training.
+### Inference (Tile-Based)
 
 ```bash
-python train.py -opt options/example_option.yml
+python scripts/inference.py \
+  --model_path experiments/ClimateUformerMultiscaleFuseModel/models/best.pth \
+  --config configs/Uformer_2020_master.yml \
+  --input_mswep data/MSWEP/2020_07_01.npy \
+  --input_era5 data/ERA5Land_winds/2020_07_01.npy \
+  --output results/CHIRPS_pred_2020_07_01.npy \
+  --tile_size 512
 ```
 
-If the training process is interrupted unexpectedly and the resume is required. Please use `--auto_resume` in the command:
+### Evaluation
 
 ```bash
-python train.py -opt options/example_option.yml --auto_resume
+python scripts/evaluate.py \
+  --model_path experiments/ClimateUformerMultiscaleFuseModel/models/best.pth \
+  --config configs/Uformer_2020_master.yml \
+  --test_list data/test_list.txt \
+  --output_dir results/metrics
 ```
 
-So far, you have finished developing your own projects using `BasicSR`. Isn't it very convenient~ :grin:
+---
 
-## As a Template
+## Citation
 
-You can use BasicSR-Examples as a template for your project. Here are some modifications you may need.
+```bibtex
+@mastersthesis{tiwari2024precipitation,
+  author = {Tiwari, Vipul},
+  title = {Estimating High-Resolution (1-4 km) Daily Precipitation with Space/Time Deep Learning},
+  school = {Indian Institute of Technology Bombay},
+  year = {2024},
+  advisor = {Lanka, Karthikeyan}
+}
+```
 
-1. Set up the *pre-commit* hook
-    1. In the root path, run:
-    > pre-commit install
-1. Modify the `LICENSE`<br>
-    This repository uses the *MIT* license, you may change it to other licenses
+**Architectural Precedent:**
 
-The simple mode do not require many modifications. Those using the installation mode may need more modifications. See [here](https://github.com/xinntao/BasicSR-examples/blob/installation/README.md#As-a-Template)
+```bibtex
+@article{zhong2024investigating,
+  author = {Zhong, Y. and others},
+  title = {Investigating transformer-based models for spatial downscaling and correcting},
+  journal = {Quarterly Journal of the Royal Meteorological Society},
+  year = {2024}
+}
+```
 
-## :e-mail: Contact
+**Comparative Work:**
 
-If you have any questions or want to add your project to the list, please email `xintao.wang@outlook.com` or `xintaowang@tencent.com`.
+```bibtex
+@article{chandel2025deep,
+  author = {Chandel, M. and others},
+  title = {Deep Learning Based Statistical Downscaling for Enhanced Representation of Indian},
+  journal = {Journal of Geophysical Research: Atmospheres},
+  year = {2025}
+}
+```
+
+---
+
+## License
+
+[Specify your license here, e.g., MIT, Apache 2.0, etc.]
+
+## Contact
+
+**Vipul Tiwari**  
+M.Tech Student, CSRE  
+Indian Institute of Technology Bombay  
+Roll: 24M0306  
+Advisor: Prof. Karthikeyan Lanka
+
+For questions or issues, please open an issue on GitHub or contact [your-email@iitb.ac.in].
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Q: RadarDataset index mismatch during training**  
+A: Verify that the date parsing in `data_prep/create_data_splits.py` exactly matches the basename-stripping logic in `basicsr/data/radar_dataset.py`. Both must resolve `MSWEP_2015_01_01.npy` → `2015-01-01`.
+
+**Q: Model saturates at low precipitation values**  
+A: Check that the asymmetric penalty parameter *a* is enabled in the loss config. If using baseline Charbonnier, saturation at ~66 mm/day is expected.
+
+**Q: Kaggle kernel timeout during training**  
+A: Use MODE B split/resume with checkpoint frequency every 5000 steps. BasicSR's `--auto_resume` flag will detect and restore from the latest checkpoint.
+
+**Q: SRTM topography branch not activating**  
+A: Ensure `topography_enabled: true` in YAML and that `srtm_path` points to a valid file. Model will error if the path is missing or inaccessible.
