@@ -98,32 +98,23 @@ Key BasicSR components:
 ```
 data/
 ├── MSWEP/
-│   ├── 2015/
-│   │   ├── MSWEP_2015_*.npy       (daily LR precipitation)
-│   │   └── ...
-│   ├── 2016/
+│   ├── 20150101.npy       (daily LR precipitation, YYYYMMDD format)
+│   ├── 20150102.npy
 │   └── ...
 ├── CHIRPS/
-│   ├── 2015/
-│   │   ├── CHIRPS_2015_*.npy      (daily HR precipitation targets)
-│   │   └── ...
-│   ├── 2016/
+│   ├── 20150101.npy       (daily HR precipitation targets)
+│   ├── 20150102.npy
 │   └── ...
 ├── ERA5Land_winds/
-│   ├── 2015/
-│   │   ├── ERA5_winds_2015_*.npy  (u, v components 0.1°)
-│   │   └── ...
-│   ├── 2016/
+│   ├── 20150101.npy       ERA5_winds_2015_*.npy  (u, v components 0.1°)
+│   ├── 20150102.npy
 │   └── ...
 ├── SRTM/
 │   └── SRTM_India.npy             (static elevation map, ~30 m resampled to 0.1°)
 ├── masks/
 │   ├── land_sea_mask_LR.npy       (0.1° land-sea mask)
 │   └── land_sea_mask_HR.npy       (0.05° land-sea mask)
-└── normalization/
-    ├── chirps_stats_train.npy     (mean, std for HR data, computed 2015–2020)
-    ├── mswep_stats_train.npy      (mean, std for LR data)
-    └── p90_hr.npy                 (P90 threshold for extreme weighting, optional)
+└── more files...
 ```
 
 #### Download & Preprocess Data
